@@ -61,6 +61,17 @@ npm run dev
 ```
 *Runs on `http://localhost:3000`. Use `ngrok http 3000` to tunnel this to your phone and test the MiniKit World App native integration!*
 
+## 🧪 How to Test (For Judges & Peers)
+
+If you are evaluating the platform remotely (e.g., via a live `ngrok` link or hosted URL) and do not have Developer Portal hardware verification setup, you can still test the entire workflow using our **Simulator Mode**:
+
+1. Open the provided `https://[your-url]` link in any standard web browser (Chrome, Safari, Firefox).
+2. Navigate to **Publish** or **Dashboard**.
+3. The platform will eagerly detect that it is _not_ inside the physical World App and will immediately engage the **Fallback Testing Mode**.
+4. An override text field will appear: `"Manual Fallback (Testing Mode)"`.
+5. Invent and type any mock wallet address (e.g., `0xABCD1234`) and click **Confirm Wallet**.
+6. **You're in!** You can now freely publish PDFs to the actual RAG engine, explore papers, and query the Artificial Intelligence just as if you had completed the cryptographic biometric hardware signatures.
+
 ## 💡 Key Features of the MVP
 * **Auto-Detect Wallets**: MiniKit detects your wallet natively; fallback fields auto-trigger for desktop testing.
 * **Smart UI Layouts**: Adaptive CSS grids that beautifully stack whether you are browsing on a 4K Desktop or an iPhone SE within the World App iframe.
