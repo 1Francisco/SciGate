@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
+
+// ############################################################
+// #   SCIGATE FORCED UPDATE V2.0.2 - X402 INITIALIZATION FIX  #
+// ############################################################
+
 import { HTTPFacilitatorClient } from '@x402/core/http';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { Network } from '@x402/core/types';

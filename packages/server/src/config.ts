@@ -7,7 +7,7 @@ import 'dotenv/config';
 export const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
 // ── Blockchain Networks ──────────────────────────────────────
-export const WORLD_CHAIN = 'eip155:4801' as const;
+export const WORLD_CHAIN = 'eip155:480' as const;
 export const BASE        = 'eip155:8453' as const;
 
 // ── USDC on World Chain (Circle-issued, 6 decimals) ──────────
