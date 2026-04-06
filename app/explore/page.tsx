@@ -242,68 +242,92 @@ export default function ExplorePage() {
 
             {/* Query panel */}
             {selectedPaper && (
-              <div className="card" style={{ position: 'sticky', top: 100, height: 'fit-content' }}>
-                <h3 style={{ marginBottom: 8 }}>Ask this paper</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 20 }}>
-                  3 free queries • Then $0.01 USDC/query via x402
-                </p>
+              <div className="card" style={{ position: 'sticky', top: 100, height: 'fit-content', border: '1px solid var(--accent-indigo)', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12)' }}>
+                <div style={{ padding: '4px 0 16px 0', borderBottom: '1px solid var(--border-color)', marginBottom: 20 }}>
+                  <h3 style={{ marginBottom: 4 }}>Ask this Paper</h3>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, background: 'rgba(16,185,129,0.1)', color: 'var(--accent-emerald)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>x402 protocol</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>0.01 USDC/query</span>
+                  </div>
+                </div>
 
-                <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Form at the TOP */}
+                <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <textarea
                     className="input"
                     value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="What methodology does this paper use?"
-                    rows={3}
-                    style={{ resize: 'vertical' }}
+                    onChange={(e) => { setQuestion(e.target.value); setShowBypassButton(false); }}
+                    placeholder="Escribe tu pregunta aquí..."
+                    rows={4}
+                    style={{ resize: 'none', background: 'rgba(255,255,255,0.03)' }}
                   />
-                  <button type="submit" className="btn-primary" disabled={answering || !question.trim()}>
-                    {answering ? '🤔 Thinking...' : '🧠 Ask RAG'}
-                  </button>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button type="submit" className="btn-primary" disabled={answering || !question.trim()} style={{ width: '100%' }}>
+                      {answering ? '🤔 Thinking...' : '🧠 Ask NanoClaw RAG'}
+                    </button>
+
+                    {needsPayment && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button 
+                          className="btn-primary" 
+                          onClick={handlePayment}
+                          disabled={paymentLoading}
+                          style={{ 
+                            background: 'var(--accent-emerald)', 
+                            borderColor: 'var(--accent-emerald)',
+                            color: 'white',
+                            width: '100%'
+                          }}
+                        >
+                          {paymentLoading ? '⏳ Confirming...' : '💳 Pay $0.01 to Unlock'}
+                        </button>
+                        
+                        {showBypassButton && (
+                          <button 
+                            onClick={() => {
+                              setNeedsPayment(false);
+                              setShowBypassButton(false);
+                              handleQuery({ preventDefault: () => {} } as any);
+                            }}
+                            className="btn-secondary"
+                            style={{ width: '100%', borderColor: '#f59e0b', color: '#f59e0b', fontSize: 13 }}
+                          >
+                            ⚠️ Saltar Pago (Modo Demo)
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </form>
 
-                {needsPayment && (
-                  <div style={{ marginTop: 12 }}>
-                    <button 
-                      className="btn-primary" 
-                      onClick={handlePayment}
-                      disabled={paymentLoading}
-                      style={{ 
-                        background: 'var(--accent-emerald)', 
-                        borderColor: 'var(--accent-emerald)',
-                        color: 'white',
-                        width: '100%'
-                      }}
-                    >
-                      {paymentLoading ? '⏳ Confirming...' : '💳 Pay $0.01 to Unlock'}
-                    </button>
-                    
-                    {showBypassButton && (
-                      <button 
-                        onClick={() => {
-                          setNeedsPayment(false);
-                          setShowBypassButton(false);
-                          handleQuery({ preventDefault: () => {} } as any);
-                        }}
-                        className="btn-secondary"
-                        style={{ marginTop: 12, width: '100%', borderColor: '#f59e0b', color: '#f59e0b', fontSize: 13 }}
-                      >
-                        ⚠️ Saltar Pago (Modo Demo Hackathon)
-                      </button>
-                    )}
+                {error && (
+                  <div style={{
+                    marginTop: 16,
+                    padding: '12px 16px',
+                    background: 'rgba(239,68,68,0.05)',
+                    borderLeft: '3px solid #ef4444',
+                    color: '#f87171',
+                    fontSize: 13,
+                  }}>
+                    {error}
                   </div>
                 )}
 
+                {/* Answer at the BOTTOM */}
                 {answer && (
                   <div style={{
-                    marginTop: 20,
-                    padding: '16px',
-                    background: 'rgba(16,185,129,0.06)',
-                    border: '1px solid rgba(16,185,129,0.15)',
+                    marginTop: 24,
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
                     borderRadius: 'var(--radius-md)',
+                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05)'
                   }}>
-                    <div style={{ fontSize: 12, color: 'var(--accent-emerald)', fontWeight: 600, marginBottom: 8 }}>✓ RAG Answer</div>
-                    <p style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{answer}</p>
+                    <div style={{ fontSize: 12, color: 'var(--accent-indigo)', fontWeight: 700, marginBottom: 10, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      ✨ AI Insight from Pi
+                    </div>
+                    <p style={{ color: 'var(--text-primary)', fontSize: 15, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{answer}</p>
                   </div>
                 )}
               </div>
