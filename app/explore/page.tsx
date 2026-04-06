@@ -79,18 +79,20 @@ export default function ExplorePage() {
   async function handlePayment() {
     if (!selectedPaper) return;
     setPaymentLoading(true);
-    setError('');
+    setError('⏳ Connectando con World App...');
 
     try {
       if (!MiniKit.isInstalled()) {
-        throw new Error('MiniKit is not installed. Please open in World App.');
+        setError('❌ Error: MiniKit no detectado. Abre esto dentro de World App o el Simulador.');
+        setPaymentLoading(false);
+        return;
       }
 
       // Safe Reference ID construction
       const paperIdShort = String(selectedPaper.paper_id || 'paper').slice(0, 8);
       const refId = `query_${paperIdShort}_${Date.now()}`;
 
-      console.log("[MiniKit] Starting payment:", { refId, recipient: RECIPIENT });
+      setError(`⏳ Solicitando pago de $0.01 USDC (Ref: ${paperIdShort})...`);
 
       // x402 Payment request using MiniKit commands
       const response = await MiniKit.commandsAsync.pay({
@@ -103,32 +105,28 @@ export default function ExplorePage() {
         recipient: RECIPIENT,
       } as any);
       
-      console.log("[MiniKit] Full Payment Response:", response);
-      
+      console.log("[MiniKit] Response:", response);
       const payload = (response as any).finalPayload;
       
-      // --- HACKATHON DEMO BYPASS: Proceed if success OR if error (in simulator) ---
+      // --- HACKATHON DEMO BYPASS ---
       if (response && (payload?.status === 'success' || payload?.status === 'error')) {
         if (payload?.status === 'error') {
-          console.warn("[DEMO] Payment failed in simulator/testnet. Bypassing for presentation...");
-          setError('⚠️ Simulator Mode: Payment mock-passed for demo.');
+          setError('⚠️ Simulator: Payment mock-passed for demo.');
         } else {
           setError('✓ Payment successful! Retrying query...');
         }
         
         setNeedsPayment(false);
-        // Small delay to let the user see the success message
         setTimeout(() => {
           handleQuery({ preventDefault: () => {} } as any);
-        }, 500);
+        }, 800);
       } else {
         const detail = payload?.status || "cancelled/failed";
-        throw new Error(`Payment ${detail}. Ensure you have balance in World App Simulator.`);
+        setError(`❌ Payment ${detail}. Revisa tu saldo en el simulador.`);
       }
     } catch (err: any) {
       console.error('Payment execution error:', err);
-      const msg = err.message || "Unknown error";
-      setError(`Payment error: ${msg.includes('length') ? 'MiniKit configuration error' : msg}`);
+      setError(`❌ Error de ejecución: ${err.message}`);
     } finally {
       setPaymentLoading(false);
     }
