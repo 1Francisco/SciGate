@@ -26,8 +26,12 @@ export async function POST(
     });
 
     if (res.status === 402) {
-      // Direct pass-through for Payment Required
-      return NextResponse.json({ error: 'Payment Required' }, { status: 402 });
+      // Pass through headers (important for x402 PAYMENT-REQUIRED header)
+      const headers = new Headers(res.headers);
+      return NextResponse.json({ error: 'Payment Required' }, { 
+        status: 402,
+        headers: headers
+      });
     }
 
     if (!res.ok) {

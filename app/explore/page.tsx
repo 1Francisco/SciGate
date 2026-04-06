@@ -94,10 +94,10 @@ export default function ExplorePage() {
 
       // Safe Reference ID construction
       const paperId = getPaperId(selectedPaper);
-      const paperIdShort = String(paperId).slice(0, 8);
-      const refId = `query_${paperIdShort}_${Date.now()}`;
+      const paperIdShort = String(paperId).slice(-8);
+      const refId = `pay_${paperIdShort}_${Math.floor(Date.now() / 1000)}`;
 
-      setError(`⏳ Solicitando pago de $0.01 USDC (Ref: ${paperIdShort})...`);
+      setError(`⏳ Solicitando autorización de pago (Ref: ${paperIdShort})...`);
 
       // x402 Payment request using MiniKit commands
       const response = await MiniKit.commandsAsync.pay({
