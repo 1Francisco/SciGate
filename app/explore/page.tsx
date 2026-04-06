@@ -8,7 +8,9 @@ const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RECIPIENT = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
 interface PaperResult {
-  contentHash: string;
+  paper_id?: string;
+  id?: string;
+  contentHash?: string;
   metadataURI?: string;
   author?: string;
   pricePerQuery?: string;
@@ -16,6 +18,7 @@ interface PaperResult {
 }
 
 export default function ExplorePage() {
+  const getPaperId = (paper: any) => paper?.paper_id || paper?.id || 'unknown';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,13 +50,14 @@ export default function ExplorePage() {
 
   async function handleQuery(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedPaper || !question.trim()) return;
+    const paperId = getPaperId(selectedPaper);
+    if (!selectedPaper || paperId === 'unknown' || !question.trim()) return;
     setAnswering(true);
     setAnswer('');
     setError('');
 
     try {
-      const res = await fetch(`/api/papers/${encodeURIComponent(selectedPaper.paper_id)}/query`, {
+      const res = await fetch(`/api/papers/${encodeURIComponent(paperId)}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question }),
@@ -89,7 +93,8 @@ export default function ExplorePage() {
       }
 
       // Safe Reference ID construction
-      const paperIdShort = String(selectedPaper.paper_id || 'paper').slice(0, 8);
+      const paperId = getPaperId(selectedPaper);
+      const paperIdShort = String(paperId).slice(0, 8);
       const refId = `query_${paperIdShort}_${Date.now()}`;
 
       setError(`⏳ Solicitando pago de $0.01 USDC (Ref: ${paperIdShort})...`);
@@ -199,7 +204,7 @@ export default function ExplorePage() {
                   <div
                     key={i}
                     className="card"
-                    style={{ cursor: 'pointer', borderColor: selectedPaper?.paper_id === paper.paper_id ? 'var(--accent-indigo)' : undefined }}
+                    style={{ cursor: 'pointer', borderColor: getPaperId(selectedPaper) === getPaperId(paper) ? 'var(--accent-indigo)' : undefined }}
                     onClick={() => { setSelectedPaper(paper); setAnswer(''); setQuestion(''); }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -211,7 +216,7 @@ export default function ExplorePage() {
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'monospace' }}>
-                        Paper {paper.paper_id?.slice(0, 16)}...
+                        Paper {getPaperId(paper).slice(0, 16)}...
                       </span>
                       <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Page {paper.page}</span>
                     </div>
