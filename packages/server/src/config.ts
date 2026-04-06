@@ -30,7 +30,7 @@ export const WORLD_APP_ID    = process.env.WORLD_APP_ID    ?? 'app_staging_place
 export const WORLD_ACTION_ID = process.env.WORLD_ACTION_ID ?? 'verify-author';
 
 // ── RAG Engine ───────────────────────────────────────────────
-export const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'http://localhost:10000';
+export const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'http://100.95.133.124:10000';
 
 // ── Prices (in USD) ──────────────────────────────────────────
 export const PRICES = {
