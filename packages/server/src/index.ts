@@ -166,16 +166,18 @@ const manualX402Middleware = async (c: any, next: any) => {
   } catch (err) {
     console.warn('[HACKATHON] Facilitator fail on Sepolia, issuing manual 402 challenge...');
     
-    // Find matching route config
+    // SAFE FALLBACK: Get requirements or use defaults
+    const defaultAccepts = [{ scheme: 'exact', price: '$0.01', network: 'eip155:4801', payTo: PAY_TO_ADDRESS }];
     const routeConfig = (routes as any)[`${context.method} ${context.path}`] || (routes as any)['POST /papers/:id/query'];
+    const accepts = routeConfig?.accepts || defaultAccepts;
     
-    // Return manual 402 challenge
+    // Return manual 402 challenge with guaranteed accepts array
     return c.json({
       error: "Payment Required",
-      accepts: routeConfig.accepts,
-      statement: routeConfig.extensions?.statement || "Access SciGate Resource"
+      accepts: accepts,
+      statement: routeConfig?.extensions?.statement || "Access SciGate Resource"
     }, 402, {
-      'PAYMENT-REQUIRED': JSON.stringify(routeConfig.accepts)
+      'PAYMENT-REQUIRED': JSON.stringify(accepts)
     });
   }
   

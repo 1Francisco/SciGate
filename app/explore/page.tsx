@@ -86,18 +86,25 @@ export default function ExplorePage() {
         throw new Error('MiniKit is not installed. Please open in World App.');
       }
 
-      // x402 Payment request
-      const { finalPayload } = await (MiniKit.commandsAsync as any).pay({
-        referenceId: `query_${(selectedPaper.paper_id || 'unknown').slice(0, 8)}_${Date.now()}`,
+      // Safe Reference ID construction
+      const paperIdShort = String(selectedPaper.paper_id || 'paper').slice(0, 8);
+      const refId = `query_${paperIdShort}_${Date.now()}`;
+
+      console.log("[MiniKit] Starting payment:", { refId, recipient: RECIPIENT });
+
+      // x402 Payment request using MiniKit commands
+      const response = await MiniKit.commandsAsync.pay({
+        reference: refId,
         chainId: 4801, // World Chain Sepolia
         tokens: [{
           symbol: 'USDCE', 
           amount: "0.01",
         }],
         recipient: RECIPIENT,
-      });
+      } as any);
       
-      if (finalPayload.status === 'success') {
+      const payload = (response as any).finalPayload;
+      if (payload && payload.status === 'success') {
         setNeedsPayment(false);
         setError('✓ Payment successful! Retrying query...');
         handleQuery({ preventDefault: () => {} } as any);
@@ -105,8 +112,9 @@ export default function ExplorePage() {
         throw new Error('Payment failed or cancelled');
       }
     } catch (err: any) {
-      console.error('Payment error:', err);
-      setError(`Payment error: ${err.message}`);
+      console.error('Payment execution error:', err);
+      const msg = err.message || "Unknown error";
+      setError(`Payment error: ${msg.includes('length') ? 'MiniKit configuration error' : msg}`);
     } finally {
       setPaymentLoading(false);
     }
