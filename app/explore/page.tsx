@@ -88,10 +88,10 @@ export default function ExplorePage() {
 
       // x402 Payment request
       const { finalPayload } = await (MiniKit.commandsAsync as any).pay({
-        referenceId: `query_${selectedPaper.paper_id.slice(0, 8)}_${Date.now()}`,
+        referenceId: `query_${(selectedPaper.paper_id || 'unknown').slice(0, 8)}_${Date.now()}`,
         chainId: 4801, // World Chain Sepolia
         tokens: [{
-          symbol: 'WLD', 
+          symbol: 'USDCE', 
           amount: "0.01",
         }],
         recipient: RECIPIENT,
