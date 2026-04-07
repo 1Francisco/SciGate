@@ -198,6 +198,19 @@ app.use('*', manualX402Middleware);
 // ── Free routes ─────────────────────────────────────────────────────────────
 app.get('/health', (c) => c.json({ status: 'ok', service: 'scigate-server', v: '2.0.1', timestamp: new Date().toISOString() }));
 
+// REMOTE DEBUG LOGGING: Allows mobile frontend to send logs to server console
+app.post('/debug/log', async (c) => {
+  try {
+    const body = await c.req.json();
+    console.log('\n--- 📱 [REMOTE_DEBUG] ---');
+    console.log(JSON.stringify(body, null, 2));
+    console.log('-------------------------\n');
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false }, 400);
+  }
+});
+
 app.get('/papers/:id/preview', async (c) => {
   const paperId = c.req.param('id');
   const { handlePreview } = await import('./routes/papers.js');

@@ -34,6 +34,19 @@ export default function ExplorePage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
+  // REMOTE LOGGING HELPER: Sends info to server console for mobile debugging
+  async function remoteLog(type: string, data: any) {
+    try {
+      await fetch(`${API_URL}/debug/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, data, timestamp: new Date().toISOString() })
+      });
+    } catch (err) {
+      console.warn('Remote logging failed (probably local dev)', err);
+    }
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
@@ -92,6 +105,7 @@ export default function ExplorePage() {
       setIsPaymentModalOpen(false); // CLOSE MODAL IF OPEN
     } catch (err: any) {
       setError(`Query failed: ${err.message}`);
+      await remoteLog('QUERY_EXCEPTION', { paperId, question, error: err.message });
     } finally {
       setAnswering(false);
     }
@@ -139,7 +153,11 @@ export default function ExplorePage() {
       console.log('--- MINIKIT DEBUG ---');
       console.log('Response:', response);
       console.log('Payload:', payload);
-      setDebugInfo(JSON.stringify({ config: { RECIPIENT, chainId: 4801 }, response, payload }, null, 2));
+      const diagnosticData = { config: { RECIPIENT, chainId: 4801 }, response, payload };
+      setDebugInfo(JSON.stringify(diagnosticData, null, 2));
+
+      // SEND TO SERVER CONSOLE
+      await remoteLog('MINIKIT_PAYMENT', diagnosticData);
 
       if (response && payload?.status === 'success') {
         setPaidPapers(prev => ({ ...prev, [paperId]: refId }));
