@@ -303,23 +303,32 @@ export default function ExplorePage() {
             </button>
           </form>
 
-          <div className={`grid-responsive ${selectedPaper ? 'split' : ''}`}>
-            <div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {results.map((paper, i) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 100 }}>
+            {results.map((paper, i) => {
+              const isSelected = getPaperId(selectedPaper) === getPaperId(paper);
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   <div
-                    key={i}
                     className="card result-paper-item"
                     style={{ 
                       cursor: 'pointer', 
-                      borderColor: getPaperId(selectedPaper) === getPaperId(paper) ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.05)',
+                      borderColor: isSelected ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.05)',
                       padding: '24px',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      transform: getPaperId(selectedPaper) === getPaperId(paper) ? 'scale(1.01)' : 'scale(1)',
-                      background: getPaperId(selectedPaper) === getPaperId(paper) ? 'rgba(99, 102, 241, 0.03)' : 'rgba(255,255,255,0.02)',
-                      boxShadow: getPaperId(selectedPaper) === getPaperId(paper) ? '0 12px 24px rgba(0,0,0,0.2)' : 'none'
+                      transform: isSelected ? 'scale(1.01)' : 'scale(1)',
+                      background: isSelected ? 'rgba(99, 102, 241, 0.03)' : 'rgba(255,255,255,0.02)',
+                      boxShadow: isSelected ? '0 12px 24px rgba(0,0,0,0.2)' : 'none',
+                      borderRadius: isSelected ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)'
                     }}
-                    onClick={() => { setSelectedPaper(paper); setAnswer(''); setQuestion(''); }}
+                    onClick={() => { 
+                      if (isSelected) {
+                        setSelectedPaper(null);
+                      } else {
+                        setSelectedPaper(paper); 
+                        setAnswer(''); 
+                        setQuestion(''); 
+                      }
+                    }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                       <div>
@@ -331,7 +340,6 @@ export default function ExplorePage() {
                       <span style={{ color: 'var(--accent-emerald)', fontSize: 14, fontWeight: 700 }}>$0.01/query</span>
                     </div>
 
-                    {/* Miniature Paper Preview inside the Card */}
                     <div style={{ 
                       background: 'white', color: '#1a1a1a', padding: '24px', borderRadius: '4px', 
                       boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)', fontFamily: '"Times New Roman", serif',
@@ -355,71 +363,86 @@ export default function ExplorePage() {
                       <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Verified Paper • World Chain</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {selectedPaper && (
-              <div className="card" style={{ position: 'sticky', top: 100, height: 'fit-content', border: '1px solid var(--accent-indigo)', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12)' }}>
-                <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid var(--border-color)', marginBottom: 20 }}>
-                  <h3 style={{ marginBottom: 4 }}>Ask NanoClaw AI</h3>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, background: 'rgba(16,185,129,0.1)', color: 'var(--accent-emerald)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>x402 protocol</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>USDC Micropayments</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <textarea
-                    className="input"
-                    value={question}
-                    onChange={(e) => { setQuestion(e.target.value); setShowBypassButton(false); }}
-                    placeholder="Escribe tu pregunta para este documento..."
-                    rows={4}
-                    style={{ resize: 'none', background: 'rgba(255,255,255,0.03)' }}
-                  />
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <button type="submit" className="btn-primary" disabled={answering || !question.trim()} style={{ width: '100%' }}>
-                      {answering ? '🤔 Analizando...' : '🧪 Consultar RAG'}
-                    </button>
-
-                    {needsPayment && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <button 
-                          className="btn-primary" 
-                          onClick={() => setIsPaymentModalOpen(true)}
-                          style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white', width: '100%' }}
-                        >
-                          💳 Pagar $0.01 p/ Consulta
-                        </button>
+                  {/* INLINE AI INTERFACE (Only visible for selected paper) */}
+                  {isSelected && (
+                    <div className="card" style={{ 
+                      borderTop: 'none', 
+                      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+                      background: 'rgba(99, 102, 241, 0.05)',
+                      borderColor: 'var(--accent-indigo)',
+                      padding: '24px',
+                      animation: 'slideDown 0.3s ease'
+                    }}>
+                      <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontSize: 16 }}>Ask NanoClaw AI</h3>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, background: 'rgba(16,185,129,0.1)', color: 'var(--accent-emerald)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>x402</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </form>
 
-                {error && !isPaymentModalOpen && (
-                  <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.05)', borderLeft: '3px solid #ef4444', color: '#f87171', fontSize: 13 }}>
-                    {error}
-                  </div>
-                )}
+                      <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <textarea
+                          className="input"
+                          value={question}
+                          onChange={(e) => { setQuestion(e.target.value); setShowBypassButton(false); }}
+                          placeholder="Escribe tu pregunta para este documento..."
+                          rows={3}
+                          style={{ resize: 'none', background: 'rgba(255,255,255,0.03)', fontSize: 14 }}
+                        />
+                        
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          <button type="submit" className="btn-primary" disabled={answering || !question.trim()} style={{ flex: 1 }}>
+                            {answering ? '🤔 Analizando...' : '🧪 Consultar RAG'}
+                          </button>
 
-                {answer && (
-                  <div style={{
-                    marginTop: 24, padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.2)',
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)'
-                  }}>
-                    <div style={{ fontSize: 12, color: 'var(--accent-indigo)', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
-                      ⚡ AI Research Analysis
+                          {needsPayment && (
+                            <button 
+                              type="button"
+                              className="btn-primary" 
+                              onClick={() => setIsPaymentModalOpen(true)}
+                              style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white', flex: 1 }}
+                            >
+                              💳 Pagar $0.01
+                            </button>
+                          )}
+                        </div>
+                      </form>
+
+                      {error && !isPaymentModalOpen && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.05)', borderLeft: '3px solid #ef4444', color: '#f87171', fontSize: 13 }}>
+                          {error}
+                        </div>
+                      )}
+
+                      {answer && (
+                        <div style={{
+                          marginTop: 24, padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.2)',
+                          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)'
+                        }}>
+                          <div style={{ fontSize: 11, color: 'var(--accent-indigo)', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            ⚡ AI Analysis Result
+                          </div>
+                          <p style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{answer}</p>
+                        </div>
+                      )}
                     </div>
-                    <p style={{ color: 'var(--text-primary)', fontSize: 15, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{answer}</p>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </main>
+      
+      <style jsx>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </>
   );
 }
