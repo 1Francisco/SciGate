@@ -136,11 +136,12 @@ export default function ExplorePage() {
       const paperIdShort = String(paperId).slice(-6);
       const refId = `pay_${paperIdShort}_${Math.floor(Date.now() / 1000)}`;
       
+      console.log('--- ENVIANDO PAGO REAL (USDC) ---');
       const response = await MiniKit.commandsAsync.pay({
         reference: refId,
-        chainId: 4801, // World Chain Mainnet (or Sepolia if using staging)
+        chainId: 4801, 
         tokens: [{
-          symbol: Tokens.USDC, 
+          symbol: "USDC", // Using literal string to avoid enum mapping issues
           amount: "0.01",
         }],
         to: RECIPIENT,
