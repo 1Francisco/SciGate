@@ -153,9 +153,11 @@ export default function ExplorePage() {
       console.log('--- MINIKIT DEBUG ---');
       console.log('Response:', response);
       console.log('Payload:', payload);
+      const diagnosticData = { config: { RECIPIENT, chainId: 4801 }, response, payload };
+      setDebugInfo(JSON.stringify(diagnosticData, null, 2));
 
-      // HACKATHON BYPASS: Treat success AND simulator errors as success for the demo
-      if (response && (payload?.status === 'success' || payload?.status === 'error' || !payload)) {
+      // ONLY AUTO-PROCEED ON SUCCESS
+      if (response && payload?.status === 'success') {
         setPaidPapers(prev => ({ ...prev, [paperId]: refId }));
         setNeedsPayment(false);
         setIsPaymentModalOpen(false); // SUCCESS: CLOSE MODAL
@@ -165,9 +167,9 @@ export default function ExplorePage() {
           handleQuery(undefined, refId);
         }, 800);
       } else {
-        const detail = payload?.status || "sin respuesta";
-        setError(`❌ Pago fallido o cancelado (${detail}).`);
-        setShowBypassButton(true);
+        const detail = payload?.status || "error o cancelación";
+        setError(`❌ World App: ${detail}.`);
+        setShowBypassButton(true); // SHOW MANUAL BYPASS BUTTON
       }
     } catch (err: any) {
       console.error('Payment error:', err);
