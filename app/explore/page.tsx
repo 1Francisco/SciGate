@@ -31,6 +31,7 @@ export default function ExplorePage() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [showBypassButton, setShowBypassButton] = useState(false);
   const [paidPapers, setPaidPapers] = useState<Record<string, string>>({});
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -74,10 +75,11 @@ export default function ExplorePage() {
       if (res.status === 402) {
         setAnswer('');
         setNeedsPayment(true);
-        setError('💳 Payment required. This query requires $0.01 USDC via x402.');
+        setIsPaymentModalOpen(true); // OPEN PRE-CHECKOUT MODAL
+        setError('💳 Micropayment required to unlock deep analytical RAG insights.');
         return;
       }
-
+      
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || err.error || 'Failed to query paper');
@@ -86,6 +88,7 @@ export default function ExplorePage() {
       const data = await res.json();
       setAnswer(data.answer || 'No answer found.');
       setNeedsPayment(false); 
+      setIsPaymentModalOpen(false); // CLOSE MODAL IF OPEN
     } catch (err: any) {
       setError(`Query failed: ${err.message}`);
     } finally {
@@ -99,18 +102,19 @@ export default function ExplorePage() {
     
     setPaymentLoading(true);
     setShowBypassButton(false);
-    setError('⏳ Solicitando autorización a World App...');
+    setError(''); 
     
     const timer = setTimeout(() => {
       setError('⚠️ El simulador no responde. Si el modal no aparece, usa el botón de abajo.');
       setShowBypassButton(true);
       setPaymentLoading(false);
-    }, 4000);
+    }, 5000);
 
     try {
       if (!MiniKit.isInstalled()) {
-        setError('❌ Error: MiniKit no detectado. Abre el simulador y refresca la caché.');
+        setError('❌ Error: MiniKit no detectado.');
         setPaymentLoading(false);
+        setIsPaymentModalOpen(false);
         setShowBypassButton(true);
         clearTimeout(timer);
         return;
@@ -134,28 +138,21 @@ export default function ExplorePage() {
       const payload = (response as any)?.finalPayload;
       
       if (response && (payload?.status === 'success' || payload?.status === 'error' || !payload)) {
-        if (payload?.status === 'error') {
-          setError('⚠️ Simulator Mode: Mock-success active.');
-        } else {
-          setError(''); // Clear error on success
-        }
-        
         setPaidPapers(prev => ({ ...prev, [paperId]: refId }));
         setNeedsPayment(false);
+        setIsPaymentModalOpen(false); // SUCCESS: CLOSE MODAL
         
-        // AUTO-RETRY: Seamlessly query again using the fresh proof
         setTimeout(() => {
           handleQuery(undefined, refId);
-        }, 1000);
+        }, 800);
       } else {
-        const detail = payload?.status || "sin respuesta";
-        setError(`❌ Pago no completado (${detail}). Reintenta.`);
+        setError(`❌ Pago no completado.`);
         setShowBypassButton(true);
       }
     } catch (err: any) {
-      console.error('Payment execution error:', err);
+      console.error('Payment error:', err);
       clearTimeout(timer);
-      setError(`❌ Error de MiniKit: ${err.message || 'Desconocido'}`);
+      setError(`❌ Error: ${err.message}`);
       setShowBypassButton(true);
     } finally {
       setPaymentLoading(false);
@@ -164,6 +161,75 @@ export default function ExplorePage() {
 
   return (
     <>
+      {/* PREMIUM CHECKOUT MODAL */}
+      {isPaymentModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div className="card" style={{
+            maxWidth: 400, width: '100%', padding: '40px', textAlign: 'center',
+            borderColor: 'var(--accent-indigo)', boxShadow: '0 0 50px rgba(99, 102, 241, 0.3)'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 20 }}>💳</div>
+            <h2 style={{ marginBottom: 12 }}>SciGate Checkout</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 32, fontSize: 15 }}>
+              Confirm your micropayment to unlock deep RAG analysis for this paper.
+            </p>
+
+            <div style={{ 
+              background: 'rgba(255,255,255,0.03)', padding: 20, borderRadius: 12, 
+              textAlign: 'left', marginBottom: 32, border: '1px solid var(--border-color)' 
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Amount</span>
+                <span style={{ color: 'var(--accent-emerald)', fontWeight: 700 }}>0.01 USDC</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Network</span>
+                <span>World Chain</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Protocol</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>x402 Micropay</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button 
+                className="btn-primary" 
+                onClick={handlePayment}
+                disabled={paymentLoading}
+                style={{ width: '100%', background: 'linear-gradient(90deg, var(--accent-indigo), var(--accent-emerald))', border: 'none' }}
+              >
+                {paymentLoading ? '⏳ Confirming...' : '🚀 Confirm & Pay'}
+              </button>
+              
+              <button 
+                className="btn-secondary" 
+                onClick={() => setIsPaymentModalOpen(false)}
+                disabled={paymentLoading}
+                style={{ width: '100%' }}
+              >
+                Cancel
+              </button>
+
+              {showBypassButton && (
+                <button 
+                  onClick={() => { setIsPaymentModalOpen(false); setNeedsPayment(false); setShowBypassButton(false); handleQuery(undefined); }}
+                  style={{ width: '100%', borderColor: '#f59e0b', color: '#f59e0b', fontSize: 13, background: 'transparent', border: '1px solid', padding: '10px', marginTop: 10, cursor: 'pointer' }}
+                >
+                  ⚠️ Saltar Pago (Modo Demo)
+                </button>
+              )}
+            </div>
+
+            {error && <div style={{ color: '#f87171', fontSize: 13, marginTop: 16 }}>{error}</div>}
+          </div>
+        </div>
+      )}
+
       <nav>
         <div className="nav-inner">
           <Link href="/" className="nav-logo">⬡ SciGate</Link>
@@ -198,20 +264,6 @@ export default function ExplorePage() {
               {loading ? '⏳' : '🔍'} Search
             </button>
           </form>
-
-          {error && (
-            <div style={{
-              padding: '16px 20px',
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: 'var(--radius-md)',
-              color: '#f87171',
-              marginBottom: 24,
-              fontSize: 14,
-            }}>
-              {error}
-            </div>
-          )}
 
           <div className={`grid-responsive ${selectedPaper ? 'split' : ''}`}>
             <div>
@@ -298,28 +350,17 @@ export default function ExplorePage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button 
                           className="btn-primary" 
-                          onClick={handlePayment}
-                          disabled={paymentLoading}
+                          onClick={() => setIsPaymentModalOpen(true)}
                           style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white', width: '100%' }}
                         >
-                          {paymentLoading ? '⏳ Confirmando...' : '💳 Pagar $0.01 p/ Consulta'}
+                          💳 Pagar $0.01 p/ Consulta
                         </button>
-                        
-                        {showBypassButton && (
-                          <button 
-                            onClick={() => { setNeedsPayment(false); setShowBypassButton(false); handleQuery({ preventDefault: () => {} } as any); }}
-                            className="btn-secondary"
-                            style={{ width: '100%', borderColor: '#f59e0b', color: '#f59e0b', fontSize: 13 }}
-                          >
-                            ⚠️ Saltar Pago (Modo Demo)
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
                 </form>
 
-                {error && (
+                {error && !isPaymentModalOpen && (
                   <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.05)', borderLeft: '3px solid #ef4444', color: '#f87171', fontSize: 13 }}>
                     {error}
                   </div>
