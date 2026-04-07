@@ -382,10 +382,10 @@ export default function ExplorePage() {
                       {/* Environment Badge */}
                       <div style={{ 
                         position: 'absolute', top: 10, right: 10, fontSize: 9, fontWeight: 800, 
-                        background: (process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('staging') ? '#f59e0b' : '#3b82f6',
+                        background: (process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('staging') || (process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('aacdf') ? '#f59e0b' : '#3b82f6',
                         color: 'white', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase'
                       }}>
-                        {(process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('staging') ? 'Staging (Sepolia)' : 'Production (Mainnet)'}
+                        {(process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('staging') || (process.env.NEXT_PUBLIC_WORLD_APP_ID || '').includes('aacdf') ? 'Staging (Sepolia)' : 'Production (Mainnet)'}
                       </div>
 
                       <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
