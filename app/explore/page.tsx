@@ -142,10 +142,8 @@ export default function ExplorePage() {
         to: RECIPIENT,
         tokens: [{
           symbol: Tokens.USDC, 
-          amount: "0.01",
+          token_amount: "10000", // 0.01 USDC = 10,000 units (6 decimals)
         }],
-        network: "world-chain", // Critical: some versions require the hyphen
-        chainId: 4801,          // Ensure chainId is explicitly sent
         description: "SciGate RAG Research Query",
       } as any);
       
