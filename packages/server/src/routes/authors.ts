@@ -5,9 +5,31 @@ import { getAuthorPapersFromChain, getPaperFromChain } from '../services/contrac
 const authors = new Hono();
 
 // ── MOCK DB FOR OFF-CHAIN PAPERS (HACKATHON MVP) ──────────────────────────────
-const MOCK_DB_PAPERS: any[] = [];
+import fs from 'fs';
+import path from 'path';
 
-// ── POST /authors/register ────────────────────────────────────────────────────
+const DB_PATH = path.resolve(process.cwd(), 'mock_db_papers.json');
+
+// Load DB
+let MOCK_DB_PAPERS: any[] = [];
+if (fs.existsSync(DB_PATH)) {
+  try {
+    MOCK_DB_PAPERS = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+    console.log(`[DB] Loaded ${MOCK_DB_PAPERS.length} papers from ${DB_PATH}`);
+  } catch (err) {
+    console.error('[DB] Failed to load mock db', err);
+  }
+}
+
+// Save DB
+function saveDB() {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(MOCK_DB_PAPERS, null, 2));
+  } catch (err) {
+    console.error('[DB] Failed to save mock db', err);
+  }
+}
+
 // Registers an author after verifying their World ID proof server-side.
 authors.post('/register', async (c) => {
   let body: any;
@@ -44,6 +66,9 @@ authors.post('/register', async (c) => {
     } else {
       MOCK_DB_PAPERS.push(newPaper);
     }
+    
+    // Save to disk
+    saveDB();
   }
 
   // Verify World ID proof server-side
