@@ -141,7 +141,7 @@ export default function UploadPage() {
       // The smart contract is strictly reserved for the x402 payment agent during reads.
 
       // 3. Register author with World ID proof and pricing in Hono server
-      await fetch('/api/authors/register', {
+      const registerRes = await fetch('/api/authors/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -152,6 +152,11 @@ export default function UploadPage() {
           price_full: priceFull
         }),
       });
+
+      if (!registerRes.ok) {
+        const errData = await registerRes.json().catch(() => ({}));
+        throw new Error(`Database registration failed: ${errData.detail || errData.error || 'Backend server might be down'}`);
+      }
 
       setUploadResult({
         ...ragData,
