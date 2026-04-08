@@ -158,7 +158,7 @@ const manualX402Middleware = async (c: any, next: any) => {
     path: c.req.path,
     method: c.req.method,
   };
-  
+
   if (!httpServer.requiresPayment(context)) {
     return await next();
   }
@@ -178,12 +178,12 @@ const manualX402Middleware = async (c: any, next: any) => {
     }
   } catch (err) {
     console.warn('[HACKATHON] Facilitator fail on Sepolia, issuing manual 402 challenge...');
-    
+
     // SAFE FALLBACK: Get requirements or use defaults
     const defaultAccepts = [{ scheme: 'exact', price: '$0.01', network: 'eip155:4801', payTo: PAY_TO_ADDRESS }];
     const routeConfig = (routes as any)[`${context.method} ${context.path}`] || (routes as any)['POST /papers/:id/query'];
     const accepts = routeConfig?.accepts || defaultAccepts;
-    
+
     // Return manual 402 challenge with guaranteed accepts array
     return c.json({
       error: "Payment Required",
@@ -193,7 +193,7 @@ const manualX402Middleware = async (c: any, next: any) => {
       'PAYMENT-REQUIRED': JSON.stringify(accepts)
     });
   }
-  
+
   return await next();
 };
 
@@ -278,9 +278,9 @@ app.get('/papers/:id/data', async (c) => {
     console.log('⏳ Initializing x402 Resource Server...');
     await resourceServer.initialize();
     console.log('✅ x402 Resource Server initialized');
-    
-    serve({ fetch: app.fetch, port: PORT }, (info) => {
-      console.log(`🚀 SciGate API running at http://localhost:${info.port}`);
+
+    serve({ fetch: app.fetch, port: PORT, hostname: '0.0.0.0' }, (info) => {
+      console.log(`🚀 SciGate API running at http://${info.address}:${info.port}`);
       console.log(`🔒 Protected endpoints require x402 payment or AgentKit free-trial`);
     });
   } catch (err) {
