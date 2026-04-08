@@ -22,8 +22,6 @@ export const worldChainSepolia = {
 // Using a public placeholder projectId for the hackathon demo resilient connection
 const projectId = 'b43d41f12d2110c710d29d33adcf4d6d';
 
-import { mainnet } from 'wagmi/chains'; // This will be removed in the next step but keeping for now only to match exactly the target
-
 export const config = createConfig({
   chains: [worldChainSepolia],
   connectors: [
