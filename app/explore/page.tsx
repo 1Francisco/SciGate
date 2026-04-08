@@ -163,22 +163,29 @@ export default function ExplorePage() {
       const responseLog = { response, payload: (response as any).payload };
       await remoteLog('MINIKIT_PAYMENT_RESPONSE', responseLog);
 
-      // ONLY AUTO-PROCEED ON SUCCESS
+      // HACKATHON SIMULATION: 
+      // Even if the payment fails (insufficient balance, canceled, etc.)
+      // we proceed to query the RAG engine using the 'demo_bypass' proof.
+      // This allows showing the real World App modal but guarantees a successful demo.
       if (response && (response as any).payload?.status === 'success') {
+        console.log('--- ✅ REAL PAYMENT SUCCESS ---');
         setPaidPapers(prev => ({ ...prev, [paperId]: refId }));
-        setNeedsPayment(false);
-        setIsPaymentModalOpen(false); // SUCCESS: CLOSE MODAL
-        setDebugInfo(null);
-        
-        setTimeout(() => {
-          handleQuery(undefined, refId);
-        }, 800);
       } else {
+        console.warn('--- 🛠️ SIMULATING SUCCESS FOR DEMO ---');
         const payload = (response as any).payload;
         const detail = payload?.status || "error o cancelación";
-        setError(`❌ World App: ${detail}.`);
-        setShowBypassButton(true); // SHOW MANUAL BYPASS BUTTON
+        setPaidPapers(prev => ({ ...prev, [paperId]: 'demo_bypass' })); // Use our special bypass proof
+        setError(`⚙️ Modo Demo: Simulando éxito tras ${detail}.`);
       }
+
+      setNeedsPayment(false);
+      setIsPaymentModalOpen(false); 
+      setDebugInfo(null);
+      
+      setTimeout(() => {
+        const proof = (response as any).payload?.status === 'success' ? refId : 'demo_bypass';
+        handleQuery(undefined, proof);
+      }, 1000);
     } catch (err: any) {
       console.error('Payment error:', err);
       clearTimeout(timer);
