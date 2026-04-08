@@ -47,10 +47,11 @@ import { authors } from './routes/authors.js';
 const evmScheme = new ExactEvmScheme()
   .registerMoneyParser(async (amount: number, network: Network) => {
     if (network !== WORLD_CHAIN) return null;
+    console.log(`💰 [X402] Generating quote for ${amount} worldchain USDC (Sepolia)`);
     return {
       amount: String(Math.round(amount * 1e6)), // USDC has 6 decimals
       asset: WORLD_USDC,
-      extra: { name: 'USD Coin', version: '2' },
+      extra: { name: 'USD Coin', symbol: 'USDC', version: '2' }, // Explicitly set symbol to USDC
     };
   });
 

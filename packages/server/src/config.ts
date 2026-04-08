@@ -15,7 +15,8 @@ export const WORLD_USDC  = '0x79A02482A880bCE3F13e09Da970dC34db4CD24d1'; // Keep
 export const BASE_USDC   = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 // ── x402 Facilitators ────────────────────────────────────────
-export const WORLD_FACILITATOR_URL = 'https://x402-worldchain.vercel.app/facilitator';
+// Switch to dedicated Sepolia facilitator to avoid USDCE mapping issues
+export const WORLD_FACILITATOR_URL = 'https://x402-worldchain-sepolia.vercel.app/facilitator';
 export const BASE_FACILITATOR_URL  = 'https://api.cdp.coinbase.com/platform/v2/x402';
 
 // ── Wallet that receives x402 payments ───────────────────────
@@ -26,7 +27,7 @@ export const WORLD_CHAIN_RPC         = process.env.WORLD_CHAIN_RPC ?? 'https://w
 export const PAPER_REGISTRY_ADDRESS  = (process.env.PAPER_REGISTRY_ADDRESS ?? '0x0000000000000000000000000000000000000000') as `0x${string}`;
 
 // ── World ID ─────────────────────────────────────────────────
-export const WORLD_APP_ID    = process.env.WORLD_APP_ID    ?? 'app_aacdf4487837b144901774135e3b0803';
+export const WORLD_APP_ID    = process.env.WORLD_APP_ID    ?? 'app_staging_aacdf4487837b144901774135e3b0803';
 export const WORLD_ACTION_ID = process.env.WORLD_ACTION_ID ?? 'verify-author';
 
 // ── RAG Engine ───────────────────────────────────────────────
