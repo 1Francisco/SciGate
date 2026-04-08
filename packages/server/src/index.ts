@@ -175,8 +175,8 @@ const manualX402Middleware = async (c: any, next: any) => {
 
   // HACKATHON BYPASS: If client sends a payment proof header, skip the challenge
   const paymentProof = c.req.header('x-payment-proof');
-  if (paymentProof && paymentProof.length > 5) {
-    console.log(`[x402] Payment proof detected: ${paymentProof.slice(0, 8)}... Unlocking request.`);
+  if (paymentProof && (paymentProof.length > 5 || paymentProof === 'demo_bypass')) {
+    console.log(`[x402] Payment bypass triggered: ${paymentProof.slice(0, 8)}... Unlocking request.`);
     return await next();
   }
 
@@ -192,20 +192,32 @@ const manualX402Middleware = async (c: any, next: any) => {
     // FORCED TESTNET REQUIREMENT: 
     // This manually constructs the x402 challenge to ensure it uses Native USDC (not USDCE) 
     // and points strictly to World Chain Sepolia (4801).
-    const forcedAccepts = [{
-      scheme: 'exact',
-      price: '$0.01',
-      network: 'eip155:4801',
-      payTo: PAY_TO_ADDRESS,
-      asset: WORLD_USDC,
-      contractName: 'USD Coin',
-      symbol: 'USDC', // DO NOT USE USDCE
-      decimals: 6
-    }];
+    const forcedAccepts = [
+      {
+        scheme: 'exact',
+        price: '$0.01',
+        network: 'eip155:4801',
+        payTo: PAY_TO_ADDRESS,
+        asset: WORLD_USDC,
+        contractName: 'USD Coin',
+        symbol: 'USDC',
+        decimals: 6
+      },
+      {
+        scheme: 'exact',
+        price: '0.005', // ~ $0.01 at current WLD prices
+        network: 'eip155:4801',
+        payTo: PAY_TO_ADDRESS,
+        asset: '0x4200000000000000000000000000000000000006', // WLD on World Chain
+        contractName: 'Worldcoin',
+        symbol: 'WLD',
+        decimals: 18
+      }
+    ];
 
     return c.json({
       error: "Payment Required",
-      detail: "Manual Sepolia Fallback active (v2.0.6)",
+      detail: "Manual Sepolia Fallback active (v2.0.7)",
       accepts: forcedAccepts
     }, 402, {
       'PAYMENT-REQUIRED': JSON.stringify(forcedAccepts)

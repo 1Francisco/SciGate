@@ -249,7 +249,12 @@ export default function ExplorePage() {
 
               {showBypassButton && (
                 <button 
-                  onClick={() => { setIsPaymentModalOpen(false); setNeedsPayment(false); setShowBypassButton(false); handleQuery(undefined); }}
+                  onClick={() => { 
+                    setIsPaymentModalOpen(false); 
+                    setNeedsPayment(false); 
+                    setShowBypassButton(false); 
+                    handleQuery(undefined, 'demo_bypass'); 
+                  }}
                   style={{ width: '100%', borderColor: '#f59e0b', color: '#f59e0b', fontSize: 13, background: 'transparent', border: '1px solid', padding: '10px', marginTop: 10, cursor: 'pointer' }}
                 >
                   ⚠️ Saltar Pago (Modo Demo)
