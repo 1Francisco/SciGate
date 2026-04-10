@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { MiniKit, Tokens } from '@worldcoin/minikit-js';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
-const RECIPIENT = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS ?? '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7';
+const RECIPIENT = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS ?? '0xc813c372D8123C1D8727d37f037F5a25f2173826';
 
 interface PaperResult {
   paper_id?: string;
@@ -143,17 +143,17 @@ export default function ExplorePage() {
         payload: { reference: refId, to: RECIPIENT, token_amount: "10000" }
       };
 
-      console.log('--- 🚀 DISPATCHING PAYMENT (V2.2 - USDC NATIVE) ---');
+      console.log('--- 🚀 DISPATCHING PAYMENT (V2.3 - USDC TESTNET) ---');
       const response = await MiniKit.commandsAsync.pay({
         reference: refId,
         to: RECIPIENT,
         tokens: [{
-          symbol: "USDC", 
+          symbol: Tokens.USDC, 
           token_amount: "10000", // 0.01 USDC (6 decimals)
         }],
         network: "worldchain", 
         chainId: 4801,
-        description: "SciGate RAG Research Query (USDC)",
+        description: "SciGate RAG Research Query (USDC Testnet)",
       } as any);
 
       clearTimeout(timer);
@@ -235,20 +235,32 @@ export default function ExplorePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <button 
                 className="btn-primary" 
-                onClick={handlePayment}
+                onClick={handlePayment} 
                 disabled={paymentLoading}
-                style={{ width: '100%', background: 'linear-gradient(90deg, var(--accent-indigo), var(--accent-emerald))', border: 'none' }}
+                style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white' }}
               >
-                {paymentLoading ? '⏳ Confirming...' : '🚀 Confirm & Pay'}
+                {paymentLoading ? 'Confirmando...' : 'Pagar 0.01 USDC'}
               </button>
               
+              <button 
+                className="btn-primary" 
+                onClick={async () => {
+                  console.log('✨ [DEMO BYPASS] Manual unlock triggered.');
+                  setIsPaymentModalOpen(false);
+                  setNeedsPayment(false);
+                  handleQuery(undefined, 'demo_bypass');
+                }} 
+                style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px dashed #f59e0b', color: '#f59e0b', fontSize: 13 }}
+              >
+                🧪 Unlock with Hackathon Credits (Staging)
+              </button>
+
               <button 
                 className="btn-secondary" 
                 onClick={() => setIsPaymentModalOpen(false)}
                 disabled={paymentLoading}
-                style={{ width: '100%' }}
               >
-                Cancel
+                Cancelar
               </button>
 
               {showBypassButton && (

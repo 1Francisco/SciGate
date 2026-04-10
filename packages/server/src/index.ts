@@ -144,7 +144,14 @@ const app = new Hono();
 // ── Health Check (TOP PRIORITY for Render/Uptime) ──────────────────────────
 app.get('/health', (c) => {
   console.log('--- [HEALTH CHECK] Hit received at ' + new Date().toISOString() + ' ---');
-  return c.json({ status: 'ok', service: 'scigate-server', v: '2.0.5', env: 'production' });
+  return c.json({ status: 'ok', service: 'scigate-server', v: '2.2.0', env: 'production' });
+});
+
+// MOBILE DEBUG LOGGING
+app.post('/debug/log', async (c) => {
+  const body = await c.req.json();
+  console.log(`📱 [MOBILE_LOG][${body.type}]`, JSON.stringify(body.data, null, 2));
+  return c.json({ logged: true });
 });
 
 app.use('*', async (c, next) => {
