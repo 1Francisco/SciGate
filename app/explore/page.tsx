@@ -149,12 +149,9 @@ export default function ExplorePage() {
         to: RECIPIENT,
         tokens: [{
           symbol: "USDC", 
-          token_amount: "10000", // 0.01 USDC (6 decimals)
-          token_address: "0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88" // <--- Forcing your specific USDC
+          token_amount: "10000", 
         }],
-        network: "worldchain", 
-        chainId: 4801,
-        description: "SciGate RAG Research Query (USDC Testnet)",
+        description: "SciGate RAG Query",
       } as any);
 
       clearTimeout(timer);
