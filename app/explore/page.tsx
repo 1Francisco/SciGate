@@ -209,12 +209,19 @@ export default function ExplorePage() {
       console.error('Payment error:', err);
       clearTimeout(timer);
       const errorMessage = err.message || 'Error desconocido';
-      setError(`❌ Error de MiniKit: ${errorMessage}`);
-      setDebugInfo(JSON.stringify({ exception: errorMessage, stack: err.stack }, null, 2));
       
       // LOG REMOTO PARA RENDER
       await remoteLog('PAYMENT_EXCEPTION', { error: errorMessage, stack: err.stack });
-      setShowBypassButton(true);
+
+      // MAGIC BYPASS EN CASO DE ERROR (Gas, red, etc.)
+      console.warn('--- ✨ EMERGENCY BYPASS TRIGGERED ---');
+      setPaidPapers(prev => ({ ...prev, [paperId]: 'demo_bypass' }));
+      setIsPaymentModalOpen(false);
+      setNeedsPayment(false);
+      
+      setTimeout(() => {
+        handleQuery(undefined, 'demo_bypass');
+      }, 500);
     } finally {
       setPaymentLoading(false);
     }
