@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MiniKit, Tokens } from '@worldcoin/minikit-js';
+import { encodeFunctionData, parseAbi } from 'viem';
+
+const USDC_CONTRACT = "0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88";
+const USDC_ABI = parseAbi(['function transfer(address to, uint256 value) public returns (bool)']);
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RECIPIENT = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS ?? '0xc813c372D8123C1D8727d37f037F5a25f2173826';
@@ -144,18 +148,35 @@ export default function ExplorePage() {
       };
 
       console.log('--- 🚀 DISPATCHING PAYMENT (V2.3 - USDC TESTNET) ---');
-      const response = await MiniKit.commandsAsync.pay({
-        reference: refId,
-        to: RECIPIENT,
-        tokens: [{
-          symbol: "USDC", 
-          token_amount: "10000", 
-        }],
-        description: "SciGate RAG Query",
-      } as any);
+      console.log('--- 🚀 DISPATCHING TRANSACTION (USDC DIRECT) ---');
+      
+      const txData = encodeFunctionData({
+        abi: USDC_ABI,
+        functionName: 'transfer',
+        args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
+      });
+
+      const response = await (MiniKit.commandsAsync.sendTransaction as any)({
+        transaction: [{
+          to: USDC_CONTRACT,
+          address: USDC_CONTRACT,
+          value: "0",
+          data: txData,
+        }]
+      });
 
       clearTimeout(timer);
-      console.log('--- MINIKIT RESPONSE RECEIVED ---');
+      console.log('--- MINIKIT TRANSACTION RESPONSE ---', response);
+
+      if (response.finalPayload.status === 'success') {
+        const hash = (response.finalPayload as any).transaction_id || 'success';
+        console.log('✅ Payment Success! Hash/ID:', hash);
+        await handleQuery(undefined, hash); // Use hash as proof
+        setPaymentLoading(false);
+        return;
+      } else {
+        throw new Error('Transaction failed or cancelled');
+      }
       
       const responseLog = { response, payload: (response as any).payload };
       await remoteLog('MINIKIT_PAYMENT_RESPONSE', responseLog);
