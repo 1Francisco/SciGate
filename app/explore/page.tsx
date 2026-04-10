@@ -158,9 +158,10 @@ export default function ExplorePage() {
 
       const response = await (MiniKit.commandsAsync.sendTransaction as any)({
         transaction: [{
-          to: USDC_CONTRACT,
-          value: "0x0",
-          data: txData,
+          address: USDC_CONTRACT,
+          abi: USDC_ABI,
+          functionName: 'transfer',
+          args: [RECIPIENT as `0x${string}`, "10000"], // 0.01 USDC
         }]
       });
 
