@@ -156,22 +156,18 @@ export default function ExplorePage() {
         args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
       });
 
-      const txObject = {
-        to: USDC_CONTRACT,
-        address: USDC_CONTRACT,
-        value: "0x0",
-        data: txData,
-      };
-
       const response = await (MiniKit.commandsAsync.sendTransaction as any)({
-        transaction: [txObject],
-        transactions: [txObject],
+        transaction: [{
+          to: USDC_CONTRACT,
+          value: "0x0",
+          data: txData,
+        }]
       });
 
       clearTimeout(timer);
       
-      // LOG DETALLADO PARA RENDER (Antes de procesar el éxito/fallo)
-      await remoteLog('MINIKIT_RAW_RESPONSE', { response });
+      // LOG DE RESPUESTA
+      await remoteLog('MINIKIT_TRANSACTION_RESPONSE', { status: response?.finalPayload?.status });
 
       if (response && response.finalPayload && response.finalPayload.status === 'success') {
         const hash = (response.finalPayload as any).transaction_id || (response.finalPayload as any).transactionHash || 'success';
