@@ -187,16 +187,31 @@ const manualX402Middleware = async (c: any, next: any) => {
 
   try {
     const result = await httpServer.processHTTPRequest(context);
-    if (result.type === 'payment-error') {
-      console.error('[x402] Payment error:', result.response.body);
-      return c.json(result.response.body, result.response.status as any, result.response.headers);
+// In-memory trial tracker for the hackathon demo
+const trialTracker = new Map<string, number>();
+const FREE_TRIAL_LIMIT = 3;
+
+const manualX402Middleware: MiddlewareHandler = async (c, next) => {
+  // Only apply to protected paper routes
+  if (!c.req.path.includes('/papers/') || c.req.path.includes('/preview')) {
+    return await next();
+  }
+
+  // Use IP or a custom header as simple identifier for the trial
+  const userId = c.req.header('x-user-id') || c.req.header('cf-connecting-ip') || 'anonymous';
+  const currentUses = trialTracker.get(userId) || 0;
+
+  try {
+    // If user still has free trials, let them through
+    if (currentUses < FREE_TRIAL_LIMIT) {
+      console.log(`[TRIAL] User ${userId} used ${currentUses + 1}/${FREE_TRIAL_LIMIT} free queries.`);
+      trialTracker.set(userId, currentUses + 1);
+      return await next();
     }
-  } catch (err) {
-    console.warn('[HACKATHON] Facilitator fail on Sepolia, issuing manual 402 challenge...');
+
+    // After limit, issue the 402 challenge
+    console.warn(`[TRIAL] User ${userId} limit reached. Issuing 402 challenge.`);
     
-    // FORCED TESTNET REQUIREMENT: 
-    // This manually constructs the x402 challenge to ensure it uses Native USDC (not USDCE) 
-    // and points strictly to World Chain Sepolia (4801).
     const forcedAccepts = [{
       scheme: 'exact',
       price: '$0.01',
@@ -209,14 +224,15 @@ const manualX402Middleware = async (c: any, next: any) => {
 
     return c.json({
       error: "Payment Required",
-      detail: "Manual Sepolia Fallback active (v2.0.7)",
+      detail: `Free trial limit (${FREE_TRIAL_LIMIT}) reached. Manual Sepolia Fallback active.`,
       accepts: forcedAccepts
     }, 402, {
       'PAYMENT-REQUIRED': JSON.stringify(forcedAccepts)
     });
+  } catch (err) {
+    console.error('[x402] Error in middleware:', err);
+    return await next();
   }
-
-  return await next();
 };
 
 app.use('*', manualX402Middleware);
