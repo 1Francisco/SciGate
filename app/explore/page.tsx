@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MiniKit, Tokens } from '@worldcoin/minikit-js';
+import { MiniKit } from '@worldcoin/minikit-js';
 import { encodeFunctionData, parseAbi } from 'viem';
 
 const USDC_CONTRACT = "0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88";
@@ -137,76 +137,36 @@ export default function ExplorePage() {
         return;
       }
 
-      const paperIdShort = String(paperId).slice(-6);
-      const refId = `pay_${paperIdShort}_${Math.floor(Date.now() / 1000)}`;
-      
-      const diagnosticData = { 
-        stage: 'PRE_DISPATCH',
-        appId: process.env.NEXT_PUBLIC_WORLD_APP_ID || 'missing',
-        config: { RECIPIENT, network: "worldchain", chainId: 4801 },
-        payload: { reference: refId, to: RECIPIENT, token_amount: "10000" }
-      };
-
-      console.log('--- 🚀 DISPATCHING PAYMENT (V2.3 - USDC TESTNET) ---');
       console.log('--- 🚀 DISPATCHING TRANSACTION (USDC DIRECT) ---');
-      
-      const txData = encodeFunctionData({
-        abi: USDC_ABI,
-        functionName: 'transfer',
-        args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
-      });
 
-      const response = await (MiniKit.commandsAsync.pay as any)({
-        reference: `pay_${Date.now()}`.substring(0, 36),
-        to: '0xc813c372D8123C1D8727d37f037F5a25f2173826',
-        tokens: [{
-          symbol: Tokens.USDC, // "USDCE" - Official enum for World Chain Sepolia
-          token_amount: "10000" // 0.01 USDC (6 decimals)
-        }],
-        network: Network.WorldChain,
-        description: 'SciGate Analytical Query'
+      const response = await MiniKit.sendTransaction({
+        chainId: 4801, // World Chain Sepolia
+        transactions: [{
+          to: USDC_CONTRACT as `0x${string}`,
+          data: encodeFunctionData({
+            abi: USDC_ABI,
+            functionName: 'transfer',
+            args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
+          }),
+          value: '0',
+        }]
       });
 
       clearTimeout(timer);
       
-      // LOG DE RESPUESTA
-      await remoteLog('MINIKIT_TRANSACTION_RESPONSE', { status: response?.finalPayload?.status });
+      await remoteLog('MINIKIT_TRANSACTION_RESPONSE', { status: response?.data?.status });
 
-      if (response && response.finalPayload && response.finalPayload.status === 'success') {
-        const hash = (response.finalPayload as any).transaction_id || (response.finalPayload as any).transactionHash || 'success';
-        console.log('✅ Payment Success! Hash/ID:', hash);
+      if (response && response.data && response.data.status === 'success') {
+        const hash = (response.data as any).transaction_id || 'success';
+        console.log('✅ Payment Success! Hash:', hash);
+        setPaidPapers(prev => ({ ...prev, [paperId]: hash }));
+        setNeedsPayment(false);
+        setIsPaymentModalOpen(false);
         await handleQuery(undefined, hash); 
-        setPaymentLoading(false);
         return;
       } else {
-        const errorDetail = response?.finalPayload ? JSON.stringify(response.finalPayload) : 'Sin respuesta de payload';
-        throw new Error(`Transaction failed or cancelled: ${errorDetail}`);
+        throw new Error('Transaction failed or cancelled');
       }
-      
-      const responseLog = { response, payload: (response as any).payload };
-      await remoteLog('MINIKIT_PAYMENT_RESPONSE', responseLog);
-
-      // HACKATHON MAGIC: 
-      // Si el pago no es exitoso (cancelado, error de red, etc.), configuramos el bypass 
-      // automáticamente. Esto garantiza que el demo FLUYA perfectamente.
-      if (response && (response as any).payload?.status === 'success') {
-        console.log('--- ✅ REAL PAYMENT SUCCESS ---');
-        setPaidPapers(prev => ({ ...prev, [paperId]: refId }));
-        setError('');
-      } else {
-        console.warn('--- ✨ MAGIC BYPASS TRIGGERED ---');
-        setPaidPapers(prev => ({ ...prev, [paperId]: 'demo_bypass' })); 
-        setError(`✨ Magic Bypass: Simulando éxito para el demo.`);
-      }
-
-      setNeedsPayment(false);
-      setIsPaymentModalOpen(false); 
-      setDebugInfo(null);
-      
-      setTimeout(() => {
-        const proof = (response as any).payload?.status === 'success' ? refId : 'demo_bypass';
-        handleQuery(undefined, proof);
-      }, 1000);
     } catch (err: any) {
       console.error('Payment error:', err);
       clearTimeout(timer);
