@@ -144,8 +144,12 @@ export default function ExplorePage() {
         return;
       }
 
-      const paymentReference = `order_${Math.random().toString(36).slice(2, 9)}_${Date.now()}`;
-      console.log('--- 🚀 DISPATCHING PAYMENT MODAL (World Chain Mainnet) ---');
+      const paymentReference = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+
+      console.log('--- 🚀 DISPATCHING PAYMENT MODAL (Mainnet Native) ---');
       await remoteLog('PAYMENT_START', { 
         paperId, 
         reference: paymentReference,
@@ -157,10 +161,9 @@ export default function ExplorePage() {
         reference: paymentReference,
         to: RECIPIENT,
         tokens: [{ 
-          symbol: 'USDCE' as any, 
+          symbol: 'USDC' as any, 
           token_amount: '0.01' 
         }],
-        network: 'worldchain' as any,
         description: `Unlock Paper: ${selectedPaper.title || paperId}`,
       });
 
