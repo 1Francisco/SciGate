@@ -137,16 +137,23 @@ export default function ExplorePage() {
         return;
       }
 
+      const paymentReference = `order_${Math.random().toString(36).slice(2, 9)}_${Date.now()}`;
       console.log('--- 🚀 DISPATCHING PAYMENT MODAL (MiniKit.pay) ---');
-      await remoteLog('PAYMENT_START', { paperId, reference: crypto.randomUUID() });
+      await remoteLog('PAYMENT_START', { 
+        paperId, 
+        reference: paymentReference,
+        to: RECIPIENT,
+        token: 'USDC'
+      });
 
       const response = await MiniKit.pay({
-        reference: crypto.randomUUID(),
+        reference: paymentReference,
         to: RECIPIENT,
         tokens: [{ 
-          symbol: 'USDCE' as any, // 'USDCE' es el valor interno para USDC en MiniKit 1.13
+          symbol: 'USDC' as any, 
           token_amount: '0.01' 
         }],
+        network: 'worldchain' as any,
         description: `Unlock Paper: ${selectedPaper.title || paperId}`,
       });
 
