@@ -168,7 +168,7 @@ export default function ExplorePage() {
         transactions: [{
           to: USDC_CONTRACT as `0x${string}`,
           data: encodedData,
-          value: '0',
+          value: '0x0',
         }],
       chainId: 480, // World Chain Mainnet
       });
