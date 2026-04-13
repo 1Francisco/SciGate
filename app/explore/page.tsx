@@ -155,32 +155,24 @@ export default function ExplorePage() {
         type: 'sendTransaction'
       });
 
-      // 1. CODIFICAMOS LA LLAMADA AL CONTRATO USDC
-      // 0.01 USDC = 10,000 unidades (6 decimales)
-      const encodedData = encodeFunctionData({
-        abi: USDC_ABI,
-        functionName: 'transfer',
-        args: [RECIPIENT as `0x${string}`, BigInt(10000)]
-      });
-
-      // 2. ENVIAMOS LA TRANSACCIÓN DIRECTA
-      const response = await MiniKit.sendTransaction({
-        transactions: [{
-          to: USDC_CONTRACT as `0x${string}`,
-          data: encodedData,
-          value: '0x0',
+      const response = await MiniKit.pay({
+        reference: paymentReference,
+        to: RECIPIENT,
+        tokens: [{ 
+          symbol: 'USDCE' as any, 
+          token_amount: '0.01' 
         }],
-      chainId: 480, // World Chain Mainnet
+        description: `Unlock Paper: ${selectedPaper.title || paperId}`,
       });
 
-      setPaymentStatus('Validando transacción...');
+      setPaymentStatus('Validando pago...');
       
-      const transactionId = response.data.userOpHash;
-      await remoteLog('MINIKIT_TX_RESPONSE', { transactionId });
+      const transactionId = response.data.transactionId;
+      await remoteLog('MINIKIT_PAY_RESPONSE', { transactionId });
 
       if (transactionId) {
         setPaymentStatus('✅ ¡Éxito! Abriendo paper...');
-        console.log('✅ Transaction Success! Hash:', transactionId);
+        console.log('✅ Payment Success! Hash:', transactionId);
         setPaidPapers(prev => ({ ...prev, [paperId]: transactionId }));
         setNeedsPayment(false);
         setIsPaymentModalOpen(false);
@@ -188,7 +180,7 @@ export default function ExplorePage() {
         await handleQuery(undefined, transactionId); 
         return;
       } else {
-        throw new Error('La transacción fue cancelada o no devolvieron un Hash válido.');
+        throw new Error('El pago fue cancelado o no devolvió un Hash válido.');
       }
     } catch (err: any) {
       console.error('Payment error:', err);
@@ -233,11 +225,14 @@ export default function ExplorePage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Red</span>
-                <span>World Chain Mainnet</span>
+                <span>World Chain</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Método</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--accent-indigo)' }}>Transferencia Directa</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)' }}>ID App</span>
+                <span style={{ fontSize: 10, opacity: 0.6 }}>app_aac...</span>
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: 8, marginTop: 8 }}>
+                Modo: <span style={{ color: 'var(--accent-emerald)' }}>Producción (Force)</span>
               </div>
             </div>
 
