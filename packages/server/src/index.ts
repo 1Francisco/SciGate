@@ -256,6 +256,17 @@ app.get('/', (c) => c.html(`
   </div>
 `));
 
+// ── Free routes ─────────────────────────────────────────────────────────────
+app.get('/papers/:id/preview', async (c) => {
+  const paperId = c.req.param('id');
+  const { handlePreview } = await import('./routes/papers.js');
+  const result = await handlePreview(paperId);
+  return c.json(result);
+});
+
+app.route('/papers', papers);
+app.route('/authors', authors);
+
 // ── Paid routes ─────────────────────────────────────────────────────────────
 app.post('/papers/:id/query', async (c) => {
   const paperId = c.req.param('id');
