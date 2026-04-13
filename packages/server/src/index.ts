@@ -312,19 +312,17 @@ console.log('\n--- 🚀 SCIGATE SERVER STARTUP (V2.0.5) ---');
 
 serve({ fetch: app.fetch, port: PORT, hostname: '0.0.0.0' }, (info) => {
   console.log(`🚀 SciGate API running at http://${info.address}:${info.port}`);
-  console.log(`🔒 Health Check is online. Initializing x402 in background (1s delay)...`);
+  console.log(`🔒 Health Check is online. Environment: PRODUCCIÓN`);
   
-  // FIXED: Add a small delay to ensure Hono is fully listening before starting background heavy tasks
-  // This helps Render's port detection logic.
-  setTimeout(() => {
-    (async () => {
-      try {
-        await resourceServer.initialize();
-        console.log('✅ x402 Resource Server initialized successfully');
-      } catch (err) {
-        console.error('⚠️ Warning: x402 Resource Server initialization failed:', err);
-        console.log('💡 Note: The server is still running, but paid endpoints may fail.');
-      }
-    })();
-  }, 1000);
+  // INITIALIZE x402 IN BACKGROUND (with safety delay)
+  // This ensures Render detects the port IMMEDIATELY while we setup heavy services.
+  setTimeout(async () => {
+    try {
+      console.log('⏳ Initializing x402 Resource Server...');
+      await resourceServer.initialize();
+      console.log('✅ x402 Resource Server initialized successfully');
+    } catch (err) {
+      console.error('⚠️ Warning: x402 Resource Server initialization failed:', err);
+    }
+  }, 100);
 });

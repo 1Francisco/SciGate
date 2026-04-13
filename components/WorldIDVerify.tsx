@@ -1,6 +1,4 @@
-'use client';
-
-import { MiniKit, VerificationLevel } from '@worldcoin/minikit-js';
+import { MiniKit } from '@worldcoin/minikit-js';
 import { useEffect, useState, useRef } from 'react';
 
 interface WorldIDVerifyProps {
@@ -20,23 +18,27 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
       if (!appId || appId === 'app_staging_placeholder') return;
       if (lock.current) return;
 
-      console.log('Triggering MiniKit verify native command...');
+      console.log('Triggering MiniKit verify command...');
       lock.current = true;
       setVerifying(true);
       
       try {
-        const { finalPayload } = await MiniKit.commandsAsync.verify({
+        // En MiniKit 1.13+, el comando verify puede ser invocado vía any si no está en el index
+        // o usando el formato de strings directo.
+        const response = await (MiniKit as any).verify({
           action: action,
           signal: signal,
-          verification_level: [VerificationLevel.Device, VerificationLevel.Orb],
+          verification_level: 'orb', // Niveles: 'orb' o 'device'
         });
 
-        if (finalPayload.status === 'success') {
-          console.log('MiniKit Verify Success:', finalPayload);
-          onSuccess(finalPayload);
+        const payload = response.data || response.finalPayload || response;
+
+        if (payload.status === 'success') {
+          console.log('MiniKit Verify Success:', payload);
+          onSuccess(payload);
         } else {
-          console.error('MiniKit Verify Error:', finalPayload);
-          onError?.(finalPayload);
+          console.error('MiniKit Verify Error:', payload);
+          onError?.(payload);
         }
       } catch (err: any) {
         console.error('MiniKit Verify Exception:', err);
