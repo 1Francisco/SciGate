@@ -159,12 +159,12 @@ export default function ExplorePage() {
       // Simplificamos el pago al máximo para evitar el input_error
       const response = await (MiniKit.commandsAsync.pay as any)({
         reference: `pay_${Date.now()}`.substring(0, 36),
-        to: RECIPIENT.toLowerCase(),
+        to: '0xc813c372D8123C1D8727d37f037F5a25f2173826', // Recipient checksummed
         tokens: [{
-          symbol: Tokens.USDC, // "USDCE" for World Chain
+          symbol: 'USDC', // Change from USDCE to USDC
           token_amount: "10000" // 0.01 USDC (6 decimals)
         }],
-        network: 'worldchain-sepolia',
+        network: 'worldchain',
         description: 'SciGate Analytical Query'
       });
 
