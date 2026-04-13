@@ -33,6 +33,7 @@ export default function ExplorePage() {
   const [error, setError] = useState('');
   const [needsPayment, setNeedsPayment] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [showBypassButton, setShowBypassButton] = useState(false);
   const [paidPapers, setPaidPapers] = useState<Record<string, string>>({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -127,20 +128,15 @@ export default function ExplorePage() {
     const paperId = getPaperId(selectedPaper);
     
     setPaymentLoading(true);
+    setPaymentStatus('Iniciando billetera...');
     setError(''); 
-    
-    const timer = setTimeout(() => {
-      setError('⚠️ El simulador no responde.');
-      setPaymentLoading(false);
-    }, 5000);
 
     try {
       if (!MiniKit.isInstalled()) {
         setError('❌ Error: MiniKit no detectado.');
         setPaymentLoading(false);
         setIsPaymentModalOpen(false);
-        setShowBypassButton(true);
-        clearTimeout(timer);
+        setPaymentStatus(null);
         return;
       }
 
@@ -149,45 +145,62 @@ export default function ExplorePage() {
         return v.toString(16);
       });
 
-      console.log('--- 🚀 DISPATCHING PAYMENT MODAL (Mainnet Native) ---');
+      console.log('--- 🚀 DISPATCHING DIRECT TRANSACTION (USDC Transfer) ---');
+      setPaymentStatus('Esperando confirmación en World App...');
+      
       await remoteLog('PAYMENT_START', { 
         paperId, 
         reference: paymentReference,
         to: RECIPIENT,
-        token: 'USDC'
+        type: 'sendTransaction'
       });
 
-      const response = await MiniKit.pay({
-        reference: paymentReference,
-        to: RECIPIENT,
-        tokens: [{ 
-          symbol: 'USDC' as any, 
-          token_amount: '0.01' 
+      // 1. CODIFICAMOS LA LLAMADA AL CONTRATO USDC
+      // 0.01 USDC = 10,000 unidades (6 decimales)
+      const encodedData = encodeFunctionData({
+        abi: USDC_ABI,
+        functionName: 'transfer',
+        args: [RECIPIENT as `0x${string}`, BigInt(10000)]
+      });
+
+      // 2. ENVIAMOS LA TRANSACCIÓN DIRECTA
+      const response = await MiniKit.sendTransaction({
+        transactions: [{
+          to: USDC_CONTRACT as `0x${string}`,
+          data: encodedData,
+          value: '0',
         }],
-        description: `Unlock Paper: ${selectedPaper.title || paperId}`,
+      chainId: 480, // World Chain Mainnet
       });
 
-      clearTimeout(timer);
+      setPaymentStatus('Validando transacción...');
       
-      await remoteLog('MINIKIT_PAY_RESPONSE', { transactionId: response?.data?.transactionId });
+      const transactionId = response.data.userOpHash;
+      await remoteLog('MINIKIT_TX_RESPONSE', { transactionId });
 
-      if (response && response.data && response.data.transactionId) {
-        const hash = response.data.transactionId;
-        console.log('✅ Payment Success! Hash:', hash);
-        setPaidPapers(prev => ({ ...prev, [paperId]: hash }));
+      if (transactionId) {
+        setPaymentStatus('✅ ¡Éxito! Abriendo paper...');
+        console.log('✅ Transaction Success! Hash:', transactionId);
+        setPaidPapers(prev => ({ ...prev, [paperId]: transactionId }));
         setNeedsPayment(false);
         setIsPaymentModalOpen(false);
-        await handleQuery(undefined, hash); 
+        setPaymentStatus(null);
+        await handleQuery(undefined, transactionId); 
         return;
       } else {
-        throw new Error('Payment failed or cancelled');
+        throw new Error('La transacción fue cancelada o no devolvieron un Hash válido.');
       }
     } catch (err: any) {
       console.error('Payment error:', err);
-      clearTimeout(timer);
       setPaymentLoading(false);
-      setError(err.message || 'Error en el proceso de pago');
-      await remoteLog('PAYMENT_EXCEPTION', { error: err.message, stack: err.stack });
+      setPaymentStatus(null);
+      
+      const isUserReject = err.message?.toLowerCase().includes('user rejected') || err.message?.toLowerCase().includes('cancelled');
+      setError(isUserReject ? 'Pago cancelado por el usuario.' : (err.message || 'Error en el proceso de pago'));
+      
+      await remoteLog('PAYMENT_EXCEPTION', { error: err.message });
+    } finally {
+      setPaymentLoading(false);
     }
   }
 
@@ -215,16 +228,16 @@ export default function ExplorePage() {
               textAlign: 'left', marginBottom: 32, border: '1px solid var(--border-color)' 
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Amount</span>
+                <span style={{ color: 'var(--text-muted)' }}>Monto</span>
                 <span style={{ color: 'var(--accent-emerald)', fontWeight: 700 }}>0.01 USDC</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Network</span>
+                <span style={{ color: 'var(--text-muted)' }}>Red</span>
                 <span>World Chain Mainnet</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Protocol</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--accent-indigo)' }}>x402 USDC Micropay</span>
+                <span style={{ color: 'var(--text-muted)' }}>Método</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--accent-indigo)' }}>Transferencia Directa</span>
               </div>
             </div>
 
@@ -235,7 +248,7 @@ export default function ExplorePage() {
                 disabled={paymentLoading}
                 style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white' }}
               >
-                {paymentLoading ? 'Confirmando...' : 'Pagar 0.01 USDC'}
+                {paymentLoading ? (paymentStatus || 'Confirmando...') : 'Pagar 0.01 USDC'}
               </button>
               
               <button className="btn-secondary" onClick={() => setIsPaymentModalOpen(false)} style={{ width: '100%' }}>

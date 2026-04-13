@@ -23,7 +23,7 @@ export const BASE_FACILITATOR_URL  = 'https://api.cdp.coinbase.com/platform/v2/x
 export const PAY_TO_ADDRESS = process.env.PAY_TO_ADDRESS ?? '0xc813c372D8123C1D8727d37f037F5a25f2173826';
 
 // ── Smart Contract ───────────────────────────────────────────
-export const WORLD_CHAIN_RPC         = process.env.WORLD_CHAIN_RPC ?? 'https://worldchain-mainnet.g.alchemy.com/public';
+export const WORLD_CHAIN_RPC         = process.env.WORLD_CHAIN_RPC ?? 'https://rpc.worldchain.dev';
 export const PAPER_REGISTRY_ADDRESS  = (process.env.PAPER_REGISTRY_ADDRESS ?? '0x0000000000000000000000000000000000000000') as `0x${string}`;
 
 // ── World ID ─────────────────────────────────────────────────
