@@ -138,6 +138,7 @@ export default function ExplorePage() {
       }
 
       console.log('--- 🚀 DISPATCHING TRANSACTION (USDC DIRECT) ---');
+      await remoteLog('TRANSACTION_START', { paperId, chainId: 4801 });
 
       const response = await MiniKit.sendTransaction({
         chainId: 4801, // World Chain Sepolia
@@ -148,7 +149,7 @@ export default function ExplorePage() {
             functionName: 'transfer',
             args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
           }),
-          value: '0',
+          value: '0x0', // Formato Hexadecimal requerido
         }]
       });
 

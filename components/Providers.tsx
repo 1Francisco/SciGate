@@ -10,12 +10,14 @@ const queryClient = new QueryClient();
 
 export default function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
-    const appId = process.env.NEXT_PUBLIC_WORLD_APP_ID;
+    // FALLBACK: Usamos el ID de tu proyecto por defecto
+    const appId = process.env.NEXT_PUBLIC_WORLD_APP_ID || 'app_aacdf4487837b144901774135e3b0803';
+    
+    console.log('--- [MINIKIT INIT] ---');
+    console.log('Target App ID:', appId);
+    
     if (appId) {
-      console.log('Installing MiniKit with App ID:', appId);
       MiniKit.install(appId);
-    } else {
-      console.warn('MiniKit App ID not found in environment variables');
     }
   }, []);
 
