@@ -156,15 +156,14 @@ export default function ExplorePage() {
         args: [RECIPIENT as `0x${string}`, BigInt(10000)], // 0.01 USDC
       });
 
-      // Simplificamos el pago al máximo para evitar el input_error
       const response = await (MiniKit.commandsAsync.pay as any)({
         reference: `pay_${Date.now()}`.substring(0, 36),
-        to: '0xc813c372D8123C1D8727d37f037F5a25f2173826', // Recipient checksummed
+        to: '0xc813c372D8123C1D8727d37f037F5a25f2173826',
         tokens: [{
-          symbol: 'USDC', // Change from USDCE to USDC
+          symbol: Tokens.USDC, // "USDCE" - Official enum for World Chain Sepolia
           token_amount: "10000" // 0.01 USDC (6 decimals)
         }],
-        network: 'worldchain',
+        network: Network.WorldChain,
         description: 'SciGate Analytical Query'
       });
 
