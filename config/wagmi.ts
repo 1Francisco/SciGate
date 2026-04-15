@@ -22,13 +22,12 @@ export const worldChain = {
 const projectId = 'b43d41f12d2110c710d29d33adcf4d6d';
 
 export const config = createConfig({
-  chains: [worldChain, worldChainSepolia],
+  chains: [worldChain],
   connectors: [
     injected(),
     walletConnect({ projectId }),
   ],
   transports: {
     [worldChain.id]: http(),
-    [worldChainSepolia.id]: http(),
   },
 });
