@@ -25,7 +25,7 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
       try {
         // En MiniKit 1.13+, el comando verify puede ser invocado vía any si no está en el index
         // o usando el formato de strings directo.
-        const response = await (MiniKit as any).commands.verify({
+        const response = await (MiniKit as any).verify({
           app_id: appId,
           action: action,
           signal: signal,
