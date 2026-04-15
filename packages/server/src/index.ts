@@ -225,8 +225,8 @@ const manualX402Middleware: MiddlewareHandler = async (c, next) => {
     // x402 V2 Compliant Payment requirements
     const manualAccepts = [{
       scheme: 'exact',
-      network: WORLD_CHAIN, // 'eip155:4801'
-      asset: WORLD_USDC,    // token address
+      network: WORLD_CHAIN, // 'eip155:480'
+      asset: WORLD_USDC,    // Mainnet token address
       amount: '10000',      // $0.01 (6 decimals)
       payTo: PAY_TO_ADDRESS,
       maxTimeoutSeconds: 3600,
@@ -254,7 +254,7 @@ app.use('*', manualX402Middleware);
 app.get('/', (c) => c.html(`
   <div style="font-family: sans-serif; padding: 40px; text-align: center;">
     <h1 style="color: #6366f1;">🛰️ SciGate API is Online</h1>
-    <p>Version: 2.0.6 | Environment: World Chain Sepolia</p>
+    <p>Version: 2.0.7 | Environment: World Chain Mainnet</p>
     <div style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 8px; display: inline-block;">
       Status: 🟢 Protected by x402 & World ID 4.0
     </div>

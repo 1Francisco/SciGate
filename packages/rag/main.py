@@ -2,7 +2,7 @@ import os
 import hashlib
 import asyncio
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -11,12 +11,13 @@ from services.pdf_parser import extract_text_and_metadata
 from services.chunker import split_text
 from services.embedder import create_embeddings, query_embeddings, get_sections
 from services.qa import answer_question
+from services.x402_server import x402_gate
 
 load_dotenv()
 
 app = FastAPI(
     title="SciGate RAG Engine",
-    description="PDF ingestion and query engine for academic papers",
+    description="PDF ingestion and query engine for academic papers (x402 Enabled)",
     version="1.0.0",
 )
 
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    exposed_headers=["Payment-Required"],
 )
 
 
@@ -96,10 +98,10 @@ async def upload_paper(file: UploadFile = File(...)):
 
 
 @app.post("/query")
-async def query_paper(req: QueryRequest):
+async def query_paper(req: QueryRequest, paid: bool = Depends(x402_gate)):
     """
     Answer a natural language question about a paper using RAG.
-    Returns the answer with cited chunks and page numbers.
+    GATED BY x402: Requires a valid USDC payment proof on World Chain.
     """
     if len(req.question.strip()) < 5:
         raise HTTPException(status_code=400, detail="Question must be at least 5 characters")

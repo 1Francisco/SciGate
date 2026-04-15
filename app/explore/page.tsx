@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { encodeFunctionData, parseAbi } from 'viem';
+import AgentControl from '@/components/AgentControl';
 
 const USDC_CONTRACT = "0x79A02482A880bCe3F13E09da970dC34dB4cD24D1";
 const USDC_ABI = parseAbi(['function transfer(address to, uint256 value) public returns (bool)']);
@@ -38,6 +39,7 @@ export default function ExplorePage() {
   const [paidPapers, setPaidPapers] = useState<Record<string, string>>({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [mode, setMode] = useState<'human' | 'agent'>('human');
 
   useEffect(() => {
     // MiniKit logging for production
@@ -159,7 +161,7 @@ export default function ExplorePage() {
         reference: paymentReference,
         to: RECIPIENT,
         tokens: [{ 
-          symbol: 'USDCE' as any, 
+          symbol: 'USDC' as any, 
           token_amount: '0.01' 
         }],
         description: `Unlock Paper: ${selectedPaper.title || paperId}`,
@@ -269,27 +271,62 @@ export default function ExplorePage() {
 
       <main style={{ paddingTop: 100, minHeight: '100vh', paddingBottom: 60 }}>
         <div className="container">
-          <div style={{ marginBottom: 48 }}>
-            <h1 style={{ fontSize: 'clamp(32px, 4vw, 52px)', marginBottom: 12 }}>
-              Explore <span className="gradient-text">Papers</span>
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 17 }}>
-              Search academic papers. First 3 queries are free — then $0.01 USDC per query via x402.
-            </p>
+          <div style={{ marginBottom: 48, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <h1 style={{ fontSize: 'clamp(32px, 4vw, 52px)', marginBottom: 12 }}>
+                Explore <span className="gradient-text">Papers</span>
+              </h1>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 17 }}>
+                Search academic papers. Human queries are $0.01 — or deploy an autonomous agent.
+              </p>
+            </div>
+
+            {/* MODE TOGGLE */}
+            <div style={{ 
+              background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', 
+              border: '1px solid rgba(255,255,255,0.05)', display: 'flex' 
+            }}>
+              <button 
+                onClick={() => setMode('human')}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: 13, fontWeight: 600,
+                  background: mode === 'human' ? '#6366f1' : 'transparent',
+                  color: mode === 'human' ? 'white' : '#94a3b8', transition: 'all 0.2s'
+                }}
+              >
+                👤 Human Mode
+              </button>
+              <button 
+                onClick={() => setMode('agent')}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: 13, fontWeight: 600,
+                  background: mode === 'agent' ? '#6366f1' : 'transparent',
+                  color: mode === 'agent' ? 'white' : '#94a3b8', transition: 'all 0.2s'
+                }}
+              >
+                ⬡ Agent Mode
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSearch} className="search-form">
-            <input
-              className="input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search: 'transformer models', 'biomedical RAG'..."
-              style={{ flex: 1, fontSize: 15, padding: '14px 20px' }}
-            />
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? '⏳' : '🔍'} Search
-            </button>
-          </form>
+          {mode === 'agent' ? (
+            <AgentControl />
+          ) : (
+            <>
+              <form onSubmit={handleSearch} className="search-form">
+                <input
+                  className="input"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search: 'transformer models', 'biomedical RAG'..."
+                  style={{ flex: 1, fontSize: 15, padding: '14px 20px' }}
+                />
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? '⏳' : '🔍'} Search
+                </button>
+              </form>
+            </>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 100 }}>
             {results.map((paper, i) => {
