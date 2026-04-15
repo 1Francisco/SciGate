@@ -18,18 +18,30 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
       if (!appId || appId === 'app_staging_placeholder') return;
       if (lock.current) return;
 
-      console.log('Triggering MiniKit verify command...');
-      lock.current = true;
-      setVerifying(true);
-      
       try {
-        // En MiniKit 1.13+, el comando verify puede ser invocado vía any si no está en el index
-        // o usando el formato de strings directo.
-        const response = await (MiniKit as any).verify({
+        if (lock.current) return;
+        lock.current = true;
+        setVerifying(true);
+        
+        console.log('Searching for verify function in MiniKit...', Object.keys(MiniKit));
+        
+        // Buscamos la función en todas las rutas posibles de MiniKit v1/v2
+        const verifyFn = (MiniKit as any).verify || 
+                         (MiniKit as any).commands?.verify || 
+                         (MiniKit as any).commands?.worldIdVerify;
+
+        if (typeof verifyFn !== 'function') {
+          console.error('Available MiniKit keys:', Object.keys(MiniKit));
+          if ((MiniKit as any).commands) console.error('Available Commands:', Object.keys((MiniKit as any).commands));
+          throw new Error('MiniKit.verify function not found. Check console for available methods.');
+        }
+
+        console.log('Found verify function, calling it...');
+        const response = await verifyFn.call(MiniKit, {
           app_id: appId,
           action: action,
           signal: signal,
-          verification_level: 'orb', // Niveles: 'orb' o 'device'
+          verification_level: 'orb',
         });
 
         const payload = response.data || response.finalPayload || response;
