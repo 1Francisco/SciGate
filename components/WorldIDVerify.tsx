@@ -14,36 +14,27 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
   const lock = useRef(false);
 
   useEffect(() => {
-    const triggerVerify = async () => {
+    const triggerVerify = async (retries = 0) => {
       if (!appId || appId === 'app_staging_placeholder') return;
-      if (lock.current) return;
-
+      
       try {
-        if (lock.current) return;
-        
         if (!MiniKit.isInstalled()) {
-          console.warn('⚠️ MiniKit is not installed yet. Waiting...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          if (!MiniKit.isInstalled()) {
-            throw new Error('MiniKit environment not detected. Are you in the World App?');
+          console.warn(`[WorldID] MiniKit not ready (Attempt ${retries + 1}). Wait...`);
+          if (retries < 5) {
+            setTimeout(() => triggerVerify(retries + 1), 1000);
+            return;
           }
+          throw new Error('MiniKit environment not detected after multiple retries.');
         }
 
         lock.current = true;
         setVerifying(true);
         
-        console.log('Using MiniKit v2 direct verify...');
+        console.log('Triggering World ID verification...');
         
-        // En v2, NO debemos tocar .commands ni .command o lanzará error.
-        // La función DEBE estar en el nivel superior si el error dice "Usa directamente".
+        // El error de getActiveMiniKit ocurre DENTRO de esta llamada si el bridge falla
         const minikitAny = MiniKit as any;
-        const verifyFn = minikitAny.verify || minikitAny.walletAuth;
-
-        if (typeof verifyFn !== 'function') {
-          throw new Error('MiniKit verification function not found in this version.');
-        }
-
-        const response = await verifyFn({
+        const response = await (minikitAny.verify || minikitAny.walletAuth)({
           app_id: appId,
           action: action,
           signal: signal,
