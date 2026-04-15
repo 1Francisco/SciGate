@@ -21,8 +21,13 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
       try {
         if (lock.current) return;
         
-        // Damos un pequeño respiro para que MiniKit.install termine su registro interno
-        await new Promise(resolve => setTimeout(resolve, 500));
+        if (!MiniKit.isInstalled()) {
+          console.warn('⚠️ MiniKit is not installed yet. Waiting...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (!MiniKit.isInstalled()) {
+            throw new Error('MiniKit environment not detected. Are you in the World App?');
+          }
+        }
 
         lock.current = true;
         setVerifying(true);
