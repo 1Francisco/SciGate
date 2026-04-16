@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { IDKitRequestWidget, orbLegacy, IDKitResult } from '@worldcoin/idkit';
+import { IDKitRequestWidget, orbLegacy, IDKitResult, IDKitErrorCodes } from '@worldcoin/idkit';
 
 interface WorldIDVerifyProps {
   appId: string;
@@ -10,8 +10,8 @@ interface WorldIDVerifyProps {
 }
 
 /**
- * WorldIDVerify (v4 / Real Modal Restoration)
- * Restores the REAL World ID modal using the v4 standard and server-side signatures.
+ * WorldIDVerify (v4 / Cycle Fix)
+ * Ensures the modal only mounts once the server signature is ready.
  */
 export default function WorldIDVerify({ appId, action, signal, onSuccess, onError }: WorldIDVerifyProps) {
   const [loading, setLoading] = useState(false);
@@ -19,124 +19,120 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   
-  // Guard to prevent multiple simultaneous requests or infinite loops
   const inFlight = useRef(false);
 
-  // Fetch the required server-side signature (RP Context) for World ID 4.0
+  // Fetch the signature from backend
   const prepareVerification = useCallback(async () => {
-    if (inFlight.current) return;
+    if (inFlight.current || rpContext) return;
     inFlight.current = true;
-    
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Fetching World ID 4.0 RP Signature...');
+      console.log(`[WorldID] Getting signature for appId: ${appId}, action: ${action}`);
       const response = await fetch('/api/auth/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, signal })
+        body: JSON.stringify({ action, signal, app_id: appId })
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error ${response.status}`);
+        throw new Error(errData.error || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to sign request');
 
+      console.log('[WorldID] Signature received, mounting modal...', data.rp_context);
       setRpContext(data.rp_context);
       setIsOpen(true);
     } catch (err: any) {
-      console.error('IDKit Prepare Error:', err);
-      setError(err.message || 'Error initializing verification');
+      console.error('[WorldID] Preparation failed:', err);
+      setError(err.message || 'Verification setup failed');
       onError?.(err);
     } finally {
       setLoading(false);
       inFlight.current = false;
     }
-  }, [action, signal, onError]); // Removed loading from dependencies to avoid loop
+  }, [appId, action, signal, rpContext, onError]);
 
-  // Automatic Trigger on mount
+  // Trigger on mount
   useEffect(() => {
-    const trigger = async () => {
-      // Only trigger if we don't have a context yet and are within a valid app environment
-      if (!rpContext && !loading && appId !== 'app_staging_placeholder') {
-        await prepareVerification();
-      }
-    };
-    trigger();
-    // We only want this to run when the component actually mounts or dependencies strictly change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appId, action, signal]); 
+    if (!rpContext && !loading && appId && appId !== 'app_staging_placeholder') {
+      prepareVerification();
+    }
+  }, [appId, rpContext, loading, prepareVerification]);
 
   if (!appId || appId === 'app_staging_placeholder') {
     return (
       <div className="card" style={{ textAlign: 'center', opacity: 0.6 }}>
-        <p>⚠️ Configuration missing: NEXT_PUBLIC_WORLD_APP_ID</p>
+        <p>⚠️ Missing Credentials: NEXT_PUBLIC_WORLD_APP_ID</p>
       </div>
     );
   }
 
   return (
     <div style={{ 
-      padding: '24px', 
+      padding: '28px', 
       textAlign: 'center', 
-      background: 'rgba(255,255,255,0.03)', 
+      background: 'rgba(255,255,255,0.02)', 
       borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border)',
       marginTop: 24 
     }}>
-      <div className="animate-pulse" style={{ fontSize: 32, marginBottom: 16 }}>🛡️</div>
-      <h3 style={{ marginBottom: 8 }}>Verifying Humanity</h3>
+      <div className="animate-pulse" style={{ fontSize: 40, marginBottom: 16 }}>🛡️</div>
+      <h3 style={{ marginBottom: 8 }}>Verifying Identity</h3>
       <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>
-        Please wait while we securely connect to World ID...
+        {loading ? 'Requesting secure signature...' : 'Connecting to World App...'}
       </p>
 
       {error && (
-        <div style={{ padding: '12px', background: 'rgba(239,68,68,0.1)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
-          <p style={{ color: '#f87171', fontSize: 13, marginBottom: 8 }}>⚠️ {error}</p>
+        <div style={{ padding: '14px', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-sm)', marginBottom: 16, border: '1px solid rgba(239,68,68,0.2)' }}>
+          <p style={{ color: '#f87171', fontSize: 13, marginBottom: 10 }}>⚠️ {error}</p>
           <button 
             className="btn-primary" 
-            onClick={() => {
-              setRpContext(null); // Clear context to allow retry
-              prepareVerification();
-            }} 
-            style={{ fontSize: 12, padding: '8px 16px' }}
+            onClick={() => { setRpContext(null); prepareVerification(); }} 
+            style={{ fontSize: 12, padding: '10px 20px' }}
           >
             Retry Verification
           </button>
         </div>
       )}
 
-      {!error && !isOpen && (
-        <div style={{ color: 'var(--accent-indigo)', fontSize: 12, fontWeight: 600 }}>
-          ⏳ INITIALIZING MODAL...
+      {loading && (
+        <div style={{ color: 'var(--accent-indigo)', fontSize: 12, fontWeight: 600, letterSpacing: '0.05em' }}>
+          ⏳ INITIALIZING...
         </div>
       )}
 
-      <IDKitRequestWidget
-        app_id={appId as `app_${string}`}
-        action={action}
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        rp_context={rpContext}
-        allow_legacy_proofs={true}
-        preset={orbLegacy({ signal: signal.toLowerCase() })}
-        onSuccess={(result) => {
-          console.log('IDKit Verification Success:', result);
-          onSuccess(result);
-        }}
-        onError={(err) => {
-          console.error('IDKit Modal Error:', err);
-          if (err !== 'user_rejected' as any) {
-             setError('Identity verification closed. Please try again.');
-          }
-          setIsOpen(false);
-          setRpContext(null); // Reset context on error to allow clean retry
-        }}
-      />
+      {/* RENDERIZADO CONDICIONAL: El widget solo existe cuando el contexto está listo */}
+      {rpContext && (
+        <IDKitRequestWidget
+          app_id={appId as `app_${string}`}
+          action={action}
+          open={isOpen}
+          onOpenChange={(open) => {
+            setIsOpen(open);
+            if (!open) setRpContext(null); // Limpiar para permitir re-intentos si se cierra
+          }}
+          rp_context={rpContext}
+          allow_legacy_proofs={true}
+          preset={orbLegacy({ signal: signal.toLowerCase() })}
+          onSuccess={(result) => {
+            console.log('[WorldID] Success Payload:', result);
+            onSuccess(result);
+          }}
+          onError={(err: IDKitErrorCodes) => {
+            console.error('[WorldID] Modal error:', err);
+            if (err !== IDKitErrorCodes.UserRejected) {
+               setError(`Modal Error: ${err}. Check portal logs.`);
+            }
+            setIsOpen(false);
+            setRpContext(null);
+          }}
+        />
+      )}
     </div>
   );
 }

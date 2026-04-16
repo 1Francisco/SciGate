@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { signRequest } from '@worldcoin/idkit/signing';
 
-// In a real production app, this key should be in your .env
-// For the hackathon staging environment, we use a valid non-zero hex string as fallback
-const SIGNING_KEY = process.env.WORLD_ID_SIGNING_KEY || 'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-const RP_ID = process.env.NEXT_PUBLIC_WORLD_RP_ID || 'rp_scigate';
-
+// Backend route for World ID 4.0 RP Signatures
 export async function POST(req: NextRequest) {
   try {
-    const { action, signal } = await req.json();
+    const { action, signal, app_id } = await req.json();
 
-    if (!action) {
-      return NextResponse.json({ error: 'Action is required' }, { status: 400 });
+    if (!action || !app_id) {
+      return NextResponse.json({ error: 'Action and App ID are required' }, { status: 400 });
     }
 
-    // Generate the World ID 4.0 RP Signature
-    // This signature proves to the World App that the request is coming from your authorized backend
+    // SIGNING_KEY logic
+    const SIGNING_KEY = process.env.WORLD_ID_SIGNING_KEY || 'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    
+    // RP_ID logic: In v4, rp_id typically matches the app_id but with rp_ prefix if using new standards
+    // or just the app_id without the app_ prefix. 
+    // For staging/backward compatibility, the Developer Portal usually provides a specific RP ID.
+    const RP_ID = process.env.NEXT_PUBLIC_WORLD_RP_ID || app_id.replace('app_', 'rp_');
+
+    console.log(`[SIGN] Generating signature for Action: ${action}, App: ${app_id}, RP: ${RP_ID}`);
+
     const { sig, nonce, createdAt, expiresAt } = signRequest({
       action: action,
       signingKeyHex: SIGNING_KEY,
