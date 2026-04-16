@@ -29,9 +29,7 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
         setVerifying(true);
         
         // Con MiniKitProvider, MiniKit.commands.verify o MiniKit.verify deberían funcionar sin errores internos
-        const minikitAny = MiniKit as any;
-        const response = await (minikitAny.verify || minikitAny.walletAuth)({
-          app_id: appId,
+        const response = await (MiniKit as any).commands.verify({
           action: action,
           signal: signal,
           verification_level: 'orb',
