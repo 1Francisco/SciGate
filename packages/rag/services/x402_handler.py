@@ -16,7 +16,10 @@ class AutonomousX402Handler:
     def __init__(self):
         private_key = os.getenv("RAG_AGENT_PRIVATE_KEY") or os.getenv("PRIVATE_KEY")
         if not private_key:
-            raise ValueError("RAG_AGENT_PRIVATE_KEY or PRIVATE_KEY must be set in .env")
+            raise ValueError(
+                "❌ MISSING AGENT PRIVATE KEY: RAG_AGENT_PRIVATE_KEY is not defined in .env. "
+                "The researcher agent needs a wallet with funds to buy context autonomously."
+            )
         
         # Initialize the EVM account and signer
         self.account = Account.from_key(private_key)

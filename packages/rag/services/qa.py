@@ -3,7 +3,7 @@ from typing import Any
 import google.generativeai as genai
 from .agent_buyer import search_and_buy_context
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
 
 SYSTEM_PROMPT = """You are SciGate, an AI assistant that helps users understand academic papers.
 You answer questions based on the provided paper excerpts. 

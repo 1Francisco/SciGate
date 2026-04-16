@@ -1,19 +1,21 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import hashlib
 import asyncio
+import json
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 from services.pdf_parser import extract_text_and_metadata
 from services.chunker import split_text
 from services.embedder import create_embeddings, query_embeddings, get_sections
 from services.qa import answer_question
 from services.x402_server import x402_gate
-
-load_dotenv()
 
 app = FastAPI(
     title="SciGate RAG Engine",
@@ -35,6 +37,9 @@ app.add_middleware(
 class QueryRequest(BaseModel):
     paper_id: str
     question: str
+
+class AgentRequest(BaseModel):
+    topic: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -146,6 +151,33 @@ async def search_papers(q: str):
     from services.embedder import search_all
     results = await asyncio.to_thread(search_all, q, n=10)
     return {"query": q, "results": results}
+
+
+@app.post("/ask-agent")
+async def ask_agent(req: AgentRequest):
+    """
+    Autonomous research loop for Agent NanoClaw.
+    Streams progress logs to the frontend via SSE.
+    """
+    async def event_generator():
+        try:
+            yield f"data: {json.dumps({'status': 'searching', 'message': f'NanoClaw: Initiating search for \"{req.topic}\"...'})}\n\n"
+            await asyncio.sleep(1)
+            
+            # The answer_question function will trigger the search_and_buy_context if info is missing
+            # We pass empty chunks to start a global search
+            from services.qa import answer_question
+            
+            yield f"data: {json.dumps({'status': 'analyzing', 'message': 'Processing knowledge and negotiating x402 access...'})}\n\n"
+            
+            final_answer = await answer_question(req.topic, [], allow_agent_buy=True)
+            
+            yield f"data: {json.dumps({'status': 'done', 'message': 'Research complete. Synthesis successful.', 'data': {'answer': final_answer, 'paper_id': 'GLOBAL_CATALOG'}})}\n\n"
+        except Exception as e:
+            print(f"Agent Loop Error: {str(e)}")
+            yield f"data: {json.dumps({'status': 'error', 'message': f'Agent failure: {str(e)}'})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
