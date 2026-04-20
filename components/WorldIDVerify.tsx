@@ -1,137 +1,149 @@
 'use client';
 
 import { useState } from 'react';
-import { MiniKit } from '@worldcoin/minikit-js';
+import { IDKitRequestWidget, orbLegacy, IDKitResult, IDKitErrorCodes } from '@worldcoin/idkit';
 
 interface WorldIDVerifyProps {
   appId: string;
   action: string;
   signal: string;
-  onSuccess: (result: any) => void;
+  onSuccess: (result: IDKitResult) => void;
   onError?: (err: any) => void;
 }
 
 /**
- * WorldIDVerify (Opción B: Wallet Auth Nativo)
- * Utiliza el comando nativo de MiniKit para autenticar al usuario.
- * No abre pestañas externas y es 100% compatible con World App Bridge.
+ * WorldIDVerify (Opción A: Verificación Humana Pro - Componente Controlado)
+ * Utiliza IDKitRequestWidget en modo controlado para máxima compatibilidad con v4.1.1.
+ * Este patrón es el más robusto para manejar la firma del servidor (rp_context).
  */
 export default function WorldIDVerify({ appId, action, signal, onSuccess, onError }: WorldIDVerifyProps) {
-  const [status, setStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
+  const [isOpen, setIsOpen] = useState(false);
+  const [rpContext, setRpContext] = useState<any>(null);
+  const [status, setStatus] = useState<'idle' | 'fetching_signature' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleWalletAuth = async () => {
-    try {
-      if (!MiniKit.isInstalled()) {
-        throw new Error('MiniKit no está instalado o no se detectó World App');
-      }
+  const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
-      setStatus('waiting');
+  const handleStartVerification = async () => {
+    try {
+      setStatus('fetching_signature');
       setErrorMsg(null);
 
-      // 1. Generar un nonce aleatorio (requerido por SIWE)
-      // En producción esto debería venir del backend, pero para hackathon lo hacemos local.
-      const nonce = crypto.randomUUID();
-      
-      console.log('[WalletAuth] Iniciando firma nativa...', { nonce });
+      console.log('[WorldID] Solicitando firma al backend...', { appId, action, signal });
 
-      // 2. Ejecutar comando nativo de MiniKit
-      // Esto abre el modal nativo de World App (firma de mensaje) sin abrir pestañas.
-      const { finalPayload } = await (MiniKit.commands as any).walletAuth({
-        nonce,
-        requestId: '0', // Opcional, pero bueno para tracking
-        statement: 'Verificando mi identidad como investigador en SciGate.',
+      const response = await fetch(`${SERVER_URL}/api/world-id/rp-context`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_id: appId, action, signal }),
       });
 
-      if (finalPayload.status === 'error') {
-        throw new Error(finalPayload.error_code || 'Fallo en la autenticación de wallet');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al obtener firma del servidor');
       }
 
-      console.log('[WalletAuth] Éxito:', finalPayload);
+      const context = await response.json();
+      console.log('[WorldID] Firma recibida exitosamente');
       
-      setStatus('success');
+      setRpContext(context);
+      setStatus('idle');
       
-      // Enviamos el resultado al padre (upload/page.tsx)
-      // Estructuramos el resultado para que sea compatible con lo que espera el backend
-      onSuccess({
-        success: true,
-        type: 'wallet_auth',
-        payload: finalPayload,
-        address: finalPayload.address
-      });
+      // Abrimos el modal nativo ahora que tenemos el rp_context
+      setIsOpen(true);
 
     } catch (err: any) {
-      console.error('[WalletAuth] Error Crítico:', err);
+      console.error('[WorldID] Error al preparar verificación:', err);
       setStatus('error');
-      setErrorMsg(err.message || 'Error desconocido al autenticar');
+      setErrorMsg(err.message || 'Error de conexión con el servidor');
       onError?.(err);
     }
   };
 
+  const handleSuccess = (result: IDKitResult) => {
+    console.log('[WorldID] Verificación Exitosa:', result);
+    setStatus('success');
+    onSuccess(result);
+  };
+
+  const handleError = (errorCode: IDKitErrorCodes) => {
+    console.error('[WorldID] Error de World ID:', errorCode);
+    setStatus('error');
+    setErrorMsg(`Error de World ID: ${errorCode}`);
+    onError?.({ code: errorCode });
+  };
+
   return (
     <div className="mt-6">
+      {/* 
+          En v4.1.1, IDKitRequestWidget es un componente invisible que se "dispara" 
+          cuando open={true}. Aquí es donde definimos onSuccess/onError.
+      */}
+      <IDKitRequestWidget
+        app_id={appId as `app_${string}`}
+        action={action}
+        // Usamos el preset de orbLegacy para pasar el signal correctamente
+        preset={orbLegacy({ signal })}
+        rp_context={rpContext}
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        onSuccess={handleSuccess}
+        onError={handleError}
+        autoClose
+        allow_legacy_proofs
+      />
+
+      {/* Interfaz de Usuario Personalizada */}
       <div className="p-8 text-center bg-white/5 border border-white/10 rounded-[32px] backdrop-blur-xl relative transition-all hover:bg-white/[0.08] shadow-2xl">
-        {/* Indicador de estado superior */}
-        <div className="absolute top-0 left-0 w-full h-1 overflow-hidden rounded-t-[32px]">
-          <div className={`h-full transition-all duration-1000 ${
-            status === 'waiting' ? 'bg-cyan-500 animate-pulse w-full' : 
-            status === 'success' ? 'bg-green-500 w-full' : 
-            status === 'error' ? 'bg-red-500 w-full' : 'bg-transparent w-0'
-          }`} />
-        </div>
+        {status === 'fetching_signature' && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-[32px] flex items-center justify-center z-10">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-cyan-400 font-bold text-xs uppercase tracking-widest">Firmando Solicitud</p>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 flex justify-center">
           <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl shadow-2xl transition-all duration-500 ${
             status === 'success' ? 'bg-green-500 shadow-green-500/30 scale-110' : 
             status === 'error' ? 'bg-red-500 shadow-red-500/30' : 
-            status === 'waiting' ? 'bg-cyan-400 animate-pulse text-black' :
-            'bg-[#00c8ff] shadow-cyan-500/20'
+            'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/20'
           }`}>
-            {status === 'success' ? '✓' : status === 'error' ? '!' : status === 'waiting' ? '⌛' : '🛡️'}
+            {status === 'success' ? '✓' : status === 'error' ? '!' : '👤'}
           </div>
         </div>
 
         <h3 className="text-xl font-bold mb-2 tracking-tight text-white">
           {status === 'success' ? 'Identidad Confirmada' : 
-           status === 'error' ? 'Autenticación Fallida' : 
-           status === 'waiting' ? 'Firmando en World App...' :
-           'Firma de Autor'}
+           status === 'error' ? 'Fallo en Verificación' : 
+           'Prueba de Humanidad'}
         </h3>
 
         <p className="text-white/50 text-sm mb-8 px-4 leading-relaxed max-w-xs mx-auto">
-          {status === 'success' ? 'Tu wallet ha sido verificada correctamente.' :
+          {status === 'success' ? 'Verificación nivel Orb completada con éxito.' :
            status === 'error' ? errorMsg : 
-           status === 'waiting' ? 'Por favor, confirma la solicitud de firma en tu World App.' :
-           'Verifica tu autoría publicando una prueba criptográfica desde tu wallet.'}
+           'Para subir tu investigación, debes demostrar que eres un humano real usando World ID.'}
         </p>
 
         {status !== 'success' && (
           <button
-            onClick={handleWalletAuth}
-            disabled={status === 'waiting'}
-            className={`w-full py-4 px-6 h-14 font-bold rounded-2xl transition-all transform active:scale-95 shadow-xl flex items-center justify-center gap-3 ${
-              status === 'waiting' 
-                ? 'bg-white/10 text-white/30 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-[#00c8ff] to-[#0072ff] text-white hover:brightness-110'
-            }`}
+            onClick={handleStartVerification}
+            disabled={status === 'fetching_signature'}
+            className="w-full py-4 px-6 h-14 bg-white text-black font-black rounded-2xl transition-all transform active:scale-95 shadow-xl flex items-center justify-center gap-3 hover:bg-gray-100"
           >
-            {status === 'waiting' ? 'Esperando World App...' : 'Verificar con World App'}
-            {status !== 'waiting' && (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            )}
+            {status === 'fetching_signature' ? 'Conectando...' : 'Verificar con World ID'}
+            <img src="https://worldcoin.org/icons/logo-black.svg" alt="W" className="w-5 h-5" />
           </button>
         )}
 
         {status === 'success' && (
           <div className="py-2 px-4 bg-green-500/20 border border-green-500/30 rounded-xl text-green-400 text-xs font-bold animate-pulse inline-block">
-            SISTEMA LISTO PARA PUBLICAR
+            CONEXIÓN SEGURA ESTABLECIDA
           </div>
         )}
 
-        <div className="mt-8 flex items-center justify-center gap-2 opacity-20 hover:opacity-100 transition-opacity duration-500 cursor-default">
-          <span className="text-[9px] uppercase tracking-[4px] font-black text-white">NATIVE AUTH v2</span>
+        <div className="mt-8 flex items-center justify-center gap-2 opacity-30 hover:opacity-100 transition-opacity">
+          <span className="text-[9px] uppercase tracking-[4px] font-black">Powered by World ID 4.1.1</span>
         </div>
       </div>
     </div>

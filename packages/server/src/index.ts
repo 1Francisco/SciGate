@@ -40,6 +40,8 @@ import {
 
 import { papers, handleQuery, handleSection, handleCitations, handleFull, handleData } from './routes/papers.js';
 import { authors } from './routes/authors.js';
+import { signRequest } from '@worldcoin/idkit-server';
+import { WORLD_ID_SIGNING_KEY, WORLD_ID_RP_ID } from './config.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // 1. x402 Setup: ExactEvmScheme + World Chain USDC money parser
@@ -271,6 +273,34 @@ app.get('/papers/:id/preview', async (c) => {
 
 app.route('/papers', papers);
 app.route('/authors', authors);
+
+// ── World ID 4.0 Native Signature ───────────────────────────────────────────
+app.post('/api/world-id/rp-context', async (c) => {
+  try {
+    const { app_id, action, signal } = await c.req.json();
+    
+    if (!WORLD_ID_SIGNING_KEY || !WORLD_ID_RP_ID) {
+      console.warn('[WorldID] Missing RP configuration. Set signing key and RP ID.');
+      return c.json({ error: 'RP Configuration missing' }, 500);
+    }
+
+    const rpContext = await signRequest(
+      WORLD_ID_RP_ID,
+      WORLD_ID_SIGNING_KEY,
+      {
+        app_id,
+        action,
+        signal: signal ?? '',
+      }
+    );
+
+    console.log(`[WorldID] RP Context generated for app: ${app_id}`);
+    return c.json(rpContext);
+  } catch (err: any) {
+    console.error('[WorldID] Failed to sign request:', err);
+    return c.json({ error: err.message || 'Signature failed' }, 500);
+  }
+});
 
 // ── Paid routes ─────────────────────────────────────────────────────────────
 app.post('/papers/:id/query', async (c) => {

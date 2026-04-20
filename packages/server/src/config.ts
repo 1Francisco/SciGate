@@ -30,6 +30,8 @@ export const PAPER_REGISTRY_ADDRESS  = (process.env.PAPER_REGISTRY_ADDRESS ?? '0
 // ── World ID ─────────────────────────────────────────────────
 export const WORLD_APP_ID    = process.env.WORLD_APP_ID    ?? 'app_aacdf4487837b144901774135e3b0803';
 export const WORLD_ACTION_ID = process.env.WORLD_ACTION_ID ?? 'verify-author';
+export const WORLD_ID_RP_ID  = process.env.WORLD_ID_RP_ID  ?? '';
+export const WORLD_ID_SIGNING_KEY = process.env.WORLD_ID_SIGNING_KEY ?? '';
 
 // ── RAG Engine ───────────────────────────────────────────────
 export const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'http://100.95.133.124:10000';
