@@ -4,31 +4,7 @@ import { getAuthorPapersFromChain, getPaperFromChain } from '../services/contrac
 
 const authors = new Hono();
 
-// ── MOCK DB FOR OFF-CHAIN PAPERS (HACKATHON MVP) ──────────────────────────────
-import fs from 'fs';
-import path from 'path';
-
-const DB_PATH = path.resolve(process.cwd(), 'mock_db_papers.json');
-
-// Load DB
-let MOCK_DB_PAPERS: any[] = [];
-if (fs.existsSync(DB_PATH)) {
-  try {
-    MOCK_DB_PAPERS = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-    console.log(`[DB] Loaded ${MOCK_DB_PAPERS.length} papers from ${DB_PATH}`);
-  } catch (err) {
-    console.error('[DB] Failed to load mock db', err);
-  }
-}
-
-// Save DB
-function saveDB() {
-  try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(MOCK_DB_PAPERS, null, 2));
-  } catch (err) {
-    console.error('[DB] Failed to save mock db', err);
-  }
-}
+import { savePaperMetadata } from '../services/supabase.js';
 
 // Registers an author after verifying their World ID proof server-side.
 authors.post('/register', async (c) => {
@@ -45,30 +21,20 @@ authors.post('/register', async (c) => {
     return c.json({ error: 'wallet_address and world_id_proof are required' }, 400);
   }
 
-  // --- HACKATHON: Mock DB Storage ---
+  // --- CLOUD MIGRATION: Supabase Storage ---
   if (paper_hash) {
-    console.log(`[DB] Storing paper ${paper_hash} off-chain for ${wallet_address}`);
-    const newPaper = {
-      wallet: wallet_address.toLowerCase(),
-      contentHash: paper_hash,
-      title: 'Off-chain Uploaded Paper',
-      totalEarnings: '0',
-      totalAccesses: 0,
-      active: true,
-      priceQuery: price_query,
-      priceFull: price_full
-    };
-    
-    // Check for duplicates to prevent React key errors
-    const existingIndex = MOCK_DB_PAPERS.findIndex(p => p.contentHash === paper_hash);
-    if (existingIndex >= 0) {
-      MOCK_DB_PAPERS[existingIndex] = newPaper;
-    } else {
-      MOCK_DB_PAPERS.push(newPaper);
+    console.log(`[Supabase] Storing paper ${paper_hash} in cloud for ${wallet_address}`);
+    try {
+      await savePaperMetadata({
+        id: paper_hash,
+        title: 'Uploaded Paper',
+        author: wallet_address.toLowerCase(),
+        price_query: Number(price_query || 0.01),
+        price_full: Number(price_full || 0.10)
+      });
+    } catch (err) {
+      console.warn('[Supabase] Failed to save metadata, but proceeding with verification:', err);
     }
-    
-    // Save to disk
-    saveDB();
   }
 
   // Verify World ID proof server-side

@@ -42,6 +42,7 @@ import { papers, handleQuery, handleSection, handleCitations, handleFull, handle
 import { authors } from './routes/authors.js';
 import { signRequest } from '@worldcoin/idkit-server';
 import { WORLD_ID_SIGNING_KEY, WORLD_ID_RP_ID } from './config.js';
+import { savePaperMetadata, getPaperMetadata } from './services/supabase.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // 1. x402 Setup: ExactEvmScheme + World Chain USDC money parser
@@ -225,12 +226,31 @@ const manualX402Middleware: MiddlewareHandler = async (c, next) => {
     console.error('[x402] Error in middleware processing, falling back to manual 402:', err);
     
     // x402 V2 Compliant Payment requirements
+    let dynamicPayTo = PAY_TO_ADDRESS;
+    try {
+      const paperId = c.req.param('id');
+      if (paperId) {
+        // High-speed cloud fallback using Supabase
+        const meta = await getPaperMetadata(paperId);
+        if (meta && meta.author) {
+          dynamicPayTo = meta.author;
+        } else {
+          // Blockchain fallback
+          const { getPaperFromChain } = await import('./services/contract.js');
+          const paper = await getPaperFromChain(paperId as `0x${string}`);
+          if (paper && paper.author) dynamicPayTo = paper.author;
+        }
+      }
+    } catch (e) {
+      console.warn('[x402] Could not fetch dynamic author, falling back to default recipient.');
+    }
+
     const manualAccepts = [{
       scheme: 'exact',
-      network: WORLD_CHAIN, // 'eip155:480'
-      asset: WORLD_USDC,    // Mainnet token address
-      amount: '10000',      // $0.01 (6 decimals)
-      payTo: PAY_TO_ADDRESS,
+      network: WORLD_CHAIN, 
+      asset: WORLD_USDC,    
+      amount: '10000',      
+      payTo: dynamicPayTo,
       maxTimeoutSeconds: 3600,
       extra: {}
     }];

@@ -10,6 +10,7 @@ import { queryPaper, getPaperSections, searchPapers } from '../services/rag.js';
 const papers = new Hono();
 
 import { PAY_TO_ADDRESS } from '../config.js';
+import { getPaperMetadata } from '../services/supabase.js';
 
 // ── GET /papers/search?q=... ──────────────────────────────────────────────────
 papers.get('/search', async (c) => {
@@ -59,37 +60,54 @@ papers.get('/search', async (c) => {
 // ── GET /papers/:id/metadata ──────────────────────────────────────────────────
 papers.get('/:id/metadata', async (c) => {
   const id = c.req.param('id') as `0x${string}`;
-  const paper = await getPaperFromChain(id);
 
-  // --- HACKATHON HYBRID FIX: Return mock metadata for local papers ---
-  if (!paper) {
+  // 1. PRIMARY SOURCE: Supabase Cloud (Fastest)
+  const cloudMeta = await getPaperMetadata(id);
+  if (cloudMeta) {
     return c.json({
       contentHash: id,
-      author: PAY_TO_ADDRESS,
-      metadataURI: 'ipfs://local-rag-resource',
-      pricePerQuery: '10000', // $0.01 (6 decimals)
-      pricePerFull: '100000', // $0.10
-      trainingPrice: '0',
-      totalEarnings: '0',
-      totalAccesses: '0',
+      author: cloudMeta.author,
+      title: cloudMeta.title || 'Research Paper',
+      pricePerQuery: String(Math.round(cloudMeta.price_query * 1e6)),
+      pricePerFull: String(Math.round(cloudMeta.price_full * 1e6)),
       active: true,
-      createdAt: new Date().toISOString(),
-      isLocal: true,
-      title: 'Local Paper (RAG Engine)'
+      source: 'cloud'
     });
   }
 
+  // 2. SECONDARY SOURCE: World Chain (Decentralized Truth)
+  const paper = await getPaperFromChain(id);
+  if (paper) {
+    return c.json({
+      contentHash: id,
+      author: paper.author,
+      metadataURI: paper.metadataURI,
+      pricePerQuery: paper.pricePerQuery.toString(),
+      pricePerFull: paper.pricePerFull.toString(),
+      trainingPrice: paper.trainingPrice.toString(),
+      totalEarnings: paper.totalEarnings.toString(),
+      totalAccesses: paper.totalAccesses.toString(),
+      active: paper.active,
+      createdAt: new Date(Number(paper.createdAt) * 1000).toISOString(),
+      source: 'blockchain'
+    });
+  }
+
+  // 3. FALLBACK: Mock/Local
   return c.json({
     contentHash: id,
-    author: paper.author,
-    metadataURI: paper.metadataURI,
-    pricePerQuery: paper.pricePerQuery.toString(),
-    pricePerFull: paper.pricePerFull.toString(),
-    trainingPrice: paper.trainingPrice.toString(),
-    totalEarnings: paper.totalEarnings.toString(),
-    totalAccesses: paper.totalAccesses.toString(),
-    active: paper.active,
-    createdAt: new Date(Number(paper.createdAt) * 1000).toISOString(),
+    author: PAY_TO_ADDRESS,
+    metadataURI: 'ipfs://local-rag-resource',
+    pricePerQuery: '10000',
+    pricePerFull: '100000',
+    trainingPrice: '0',
+    totalEarnings: '0',
+    totalAccesses: '0',
+    active: true,
+    createdAt: new Date().toISOString(),
+    isLocal: true,
+    title: 'Local Paper (RAG Engine)',
+    source: 'fallback'
   });
 });
 

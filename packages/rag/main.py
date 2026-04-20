@@ -83,10 +83,10 @@ async def upload_paper(file: UploadFile = File(...)):
         chunks = split_text(parsed["full_text"], paper_id=paper_id, pages=parsed["pages"])
         print(f"Created {len(chunks)} chunks")
 
-        # Store in ChromaDB
-        print("Creating embeddings and storing in ChromaDB...")
+        # Store in Supabase Vector
+        print("Creating embeddings and storing in Supabase...")
         await asyncio.to_thread(create_embeddings, chunks, paper_id)
-        print("ChromaDB storage complete")
+        print("Supabase storage complete")
 
         return {
             "paper_id": paper_id,

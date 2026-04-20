@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
+    "@supabase/supabase-js": "^2.104.0",
     "@worldcoin/agentkit": "^0.1.5",
     "@worldcoin/idkit-server": "^1.1.1",
     "@x402/core": "^2.8.0",

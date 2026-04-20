@@ -3,106 +3,20 @@ import json
 import numpy as np
 from typing import Any, List, Dict
 import google.generativeai as genai
+from supabase import create_client, Client
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# ────────────────────────────────────────────────────────────────────────────
-# Lightweight In-Memory Storage (Fallback for ChromaDB)
-# ────────────────────────────────────────────────────────────────────────────
-class LiteMemoryStore:
-    def __init__(self, persistence_path: str = "./lite_db.json"):
-        self.path = persistence_path
-        self.data: List[Dict[str, Any]] = []
-        self.load()
+# Configure Supabase
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_ANON_KEY")
 
-    def load(self):
-        """Try to load from a JSON file for basic persistence across restarts."""
-        if os.path.exists(self.path):
-            try:
-                with open(self.path, "r", encoding="utf-8") as f:
-                    self.data = json.load(f)
-                    print(f"--- LITE-DB: Loaded {len(self.data)} chunks from {self.path} ---")
-            except Exception as e:
-                print(f"--- LITE-DB: Load error: {e} ---")
-                self.data = []
-
-    def save(self):
-        """Save to JSON in a background thread to avoid blocking."""
-        import threading
-        def _silent_save():
-            try:
-                with open(self.path, "w", encoding="utf-8") as f:
-                    json.dump(self.data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                print(f"--- LITE-DB: Background Save error: {e} ---")
-        
-        threading.Thread(target=_silent_save, daemon=True).start()
-
-    def upsert(self, ids: List[str], embeddings: List[List[float]], documents: List[str], metadatas: List[Dict[str, Any]]):
-        """Add or update chunks in memory and trigger background save."""
-        for i, (id_val, emb, doc, meta) in enumerate(zip(ids, embeddings, documents, metadatas)):
-            # Check if ID already exists and replace, otherwise append
-            existing = next((idx for idx, item in enumerate(self.data) if item["id"] == id_val), None)
-            record = {
-                "id": id_val,
-                "embedding": list(emb),
-                "text": doc,
-                "metadata": meta
-            }
-            if existing is not None:
-                self.data[existing] = record
-            else:
-                self.data.append(record)
-        self.save()
-
-    def query(self, query_embeddings: List[List[float]], n_results: int, where: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Perform cosine similarity search across in-memory chunks."""
-        q_vec = np.array(query_embeddings[0])
-        
-        # Filter data based on 'where' (e.g., {"paper_id": "0x..."})
-        candidates = self.data
-        if where:
-            candidates = [
-                item for item in self.data 
-                if all(item["metadata"].get(k) == v for k, v in where.items())
-            ]
-
-        if not candidates:
-            return {"documents": [[]], "metadatas": [[]]}
-
-        # Calculate cosine similarities
-        scores = []
-        for item in candidates:
-            item_vec = np.array(item["embedding"])
-            # Cosine similarity: (A dot B) / (||A|| * ||B||)
-            sim = np.dot(q_vec, item_vec) / (np.linalg.norm(q_vec) * np.linalg.norm(item_vec))
-            scores.append((sim, item))
-
-        # Sort by score descending and take top N
-        scores.sort(key=lambda x: x[0], reverse=True)
-        top_n = scores[:n_results]
-
-        return {
-            "documents": [[item["text"] for score, item in top_n]],
-            "metadatas": [[item["metadata"] for score, item in top_n]]
-        }
-
-    def get(self, where: Dict[str, Any] = None, include: List[str] = None) -> Dict[str, Any]:
-        """Fetch records by metadata filters."""
-        candidates = self.data
-        if where:
-            candidates = [
-                item for item in self.data 
-                if all(item["metadata"].get(k) == v for k, v in where.items())
-            ]
-        
-        return {
-            "documents": [item["text"] for item in candidates],
-            "metadatas": [item["metadata"] for item in candidates]
-        }
-
-# Instantiate the global lite client
-_store = LiteMemoryStore()
+if not supabase_url or not supabase_key:
+    # Use a dummy client or raise error in production
+    supabase: Client = None
+    print("--- WARNING: SUPABASE CONFIGURATION MISSING ---")
+else:
+    supabase: Client = create_client(supabase_url, supabase_key)
 
 def _embed(texts: List[str]) -> List[List[float]]:
     """Generate embeddings via Google Gemini with robust fallback."""
@@ -137,67 +51,105 @@ def _embed(texts: List[str]) -> List[List[float]]:
     return [[random.uniform(-1, 1) for _ in range(768)] for _ in texts]
 
 def create_embeddings(chunks: List[Dict[str, Any]], paper_id: str) -> None:
-    """Store chunk embeddings in MemoryStore."""
-    if not chunks:
+    """Store chunk embeddings in Supabase."""
+    if not chunks or not supabase:
         return
 
     texts = [c["text"] for c in chunks]
-    ids = [f"{paper_id}_{c['chunk_index']}" for c in chunks]
-    metas = [
-        {
-            "paper_id": c["paper_id"],
-            "chunk_index": c["chunk_index"],
-            "page": c["page"],
-        }
-        for c in chunks
-    ]
-
     embeddings = _embed(texts)
-    _store.upsert(ids=ids, embeddings=embeddings, documents=texts, metadatas=metas)
+    
+    rows = []
+    for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+        rows.append({
+            "paper_id": paper_id,
+            "content": chunk["text"],
+            "page": chunk["page"],
+            "chunk_index": chunk["chunk_index"],
+            "embedding": emb
+        })
+
+    try:
+        print(f"--- SUPABASE: Inserting {len(rows)} chunks for paper {paper_id} ---")
+        supabase.table("chunks").insert(rows).execute()
+        print("--- SUPABASE: Vector storage complete ---")
+    except Exception as e:
+        print(f"--- SUPABASE INSERT ERROR: {str(e)} ---")
+        raise e
 
 def query_embeddings(paper_id: str, question: str, n: int = 4) -> List[Dict[str, Any]]:
-    """Retrieve top-n relevant chunks for a question."""
-    q_embedding = _embed([question])[0]
-
-    results = _store.query(
-        query_embeddings=[q_embedding],
-        n_results=n,
-        where={"paper_id": paper_id},
-    )
-
-    if not results["documents"] or not results["documents"][0]:
+    """Retrieve top-n relevant chunks for a question using Supabase Vector."""
+    if not supabase:
+        print("--- SUPABASE ERROR: Client not initialized ---")
         return []
 
-    chunks = []
-    for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        chunks.append({
-            "text": doc,
-            "page": meta["page"],
-            "chunk_index": meta["chunk_index"],
-        })
-    return chunks
+    q_embedding = _embed([question])[0]
+
+    try:
+        # Call the match_chunks RPC function defined in Supabase
+        res = supabase.rpc("match_chunks", {
+            "query_embedding": q_embedding,
+            "match_threshold": 0.5,
+            "match_count": n,
+            "p_paper_id": paper_id
+        }).execute()
+
+        if not res.data:
+            return []
+
+        chunks = []
+        for item in res.data:
+            chunks.append({
+                "text": item["content"],
+                "page": item["page"],
+                "chunk_index": item["chunk_index"]
+            })
+        return chunks
+    except Exception as e:
+        print(f"--- SUPABASE QUERY ERROR: {str(e)} ---")
+        return []
 
 def get_sections(paper_id: str) -> List[Dict[str, Any]]:
     """Return chunks grouped by section (supports /sections endpoint)."""
-    results = _store.get(where={"paper_id": paper_id}, include=["documents", "metadatas"])
-    if not results["documents"]:
+    if not supabase:
         return []
 
-    from .chunker import detect_sections
-    full_text = "\n".join(results["documents"])
-    return detect_sections(full_text)
+    try:
+        res = supabase.table("chunks").select("content").eq("paper_id", paper_id).execute()
+        if not res.data:
+            return []
+
+        from .chunker import detect_sections
+        full_text = "\n".join([item["content"] for item in res.data])
+        return detect_sections(full_text)
+    except Exception as e:
+        print(f"--- SUPABASE SECTIONS ERROR: {str(e)} ---")
+        return []
 
 def search_all(query: str, n: int = 10) -> List[Dict[str, Any]]:
-    """Global semantic search across all papers."""
-    q_embedding = _embed([query])[0]
-    results = _store.query(query_embeddings=[q_embedding], n_results=n)
+    """Global semantic search across all papers in Supabase."""
+    if not supabase:
+        return []
 
-    out = []
-    if results["documents"] and results["documents"][0]:
-        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-            out.append({
-                "paper_id": meta["paper_id"],
-                "page": meta["page"],
-                "snippet": doc[:300],
-            })
-    return out
+    q_embedding = _embed([query])[0]
+    
+    try:
+        # Note: True global search needs an RPC without paper_id filter.
+        # This implementation assumes the RPC can handle filtering.
+        res = supabase.rpc("match_chunks", {
+            "query_embedding": q_embedding,
+            "match_threshold": 0.3,
+            "match_count": n,
+            "p_paper_id": "GLOBAL" # Logic placeholder
+        }).execute()
+
+        out = []
+        if res.data:
+            for item in res.data:
+                out.append({
+                    "paper_id": item.get("paper_id", "Unknown"),
+                    "page": item["page"],
+                    "snippet": item["content"][:300],
+                })
+        return out
+    except:
+        return []
