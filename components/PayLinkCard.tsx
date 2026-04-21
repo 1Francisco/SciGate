@@ -55,7 +55,7 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       // 1. Intentar acceder al recurso para obtener el desafío 402 si no lo tenemos
       const isAgent = paperId.startsWith('agent');
       const probeUrl = isAgent 
-        ? `${serverUrl}/agent/ask` 
+        ? `${serverUrl}/agent/${paperId.replace('agent-', '')}` 
         : `${serverUrl}/papers/${paperId}/full`;
 
       addLog(`Probing Protocol...`, 'info', `X-Handshake: ${probeUrl}`);
