@@ -39,6 +39,7 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
   const [content, setContent] = useState<string | null>(null);
   const [logs, setLogs] = useState<{msg: string, type: 'info' | 'success' | 'warn' | 'error', detail?: string}[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{address: string, amount: string} | null>(null);
 
   const addLog = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'info', detail?: string) => {
     setLogs(prev => [...prev, { msg, type, detail }]);
@@ -104,6 +105,11 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
 
       const amountUnits = BigInt(exactScheme.amount);
       const recipient = exactScheme.payTo;
+
+      setPaymentDetails({
+        address: recipient,
+        amount: (Number(exactScheme.amount) / 1e6).toFixed(2)
+      });
 
       addLog(`Challenge Decodificado: ${exactScheme.amount / 1e6} USDC -> ${recipient.slice(0,10)}...`, 'success');
 
@@ -227,6 +233,21 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
         {status === 'error' && (
           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[11px] mb-6 animate-pulse font-medium flex gap-3 items-center">
              <span className="text-lg">⚠️</span> {errorMsg}
+          </div>
+        )}
+
+        {paymentDetails && status !== 'unlocked' && (
+          <div className="mb-6 p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl animate-fade-in-up">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[9px] uppercase tracking-widest text-indigo-400 font-bold">Destinatario On-Chain</span>
+              <span className="text-[9px] font-mono text-white/40">World Chain</span>
+            </div>
+            <div className="flex items-center gap-2 group/addr">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[11px] font-mono text-indigo-300 break-all leading-tight">
+                {paymentDetails.address}
+              </span>
+            </div>
           </div>
         )}
 
