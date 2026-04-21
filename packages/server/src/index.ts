@@ -201,6 +201,8 @@ const manualX402Middleware: MiddlewareHandler = async (c, next) => {
     method: c.req.method,
   };
 
+  console.log(`[x402][Debug] Middleware Hit: ${c.req.method} ${c.req.path}`);
+
   // 1. Check if route requires payment
   if (!httpServer.requiresPayment(context)) {
     return await next();
@@ -377,26 +379,26 @@ app.get('/papers/:id/data', async (c) => {
 });
 
 // ── Global Agent Proxy (Gated) ──────────────────────────────────────────────
-app.post('/agent/:mode', async (c) => {
-  const mode = c.req.param('mode'); // query or full
+async function handleAgentRequest(c: any, mode: string) {
   try {
     const { topic } = await c.req.json();
     const { RAG_SERVICE_URL } = await import('./config.js');
 
-    console.log(`[AgentGated][${mode}] Proxying to Pi: ${RAG_SERVICE_URL}/ask-agent`);
+    console.log(`[AgentGated][${mode}] Proxying research: "${topic}" -> ${RAG_SERVICE_URL}`);
 
     // Connect to Raspberry Pi RAG
     const response = await fetch(`${RAG_SERVICE_URL}/ask-agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, mode }), // Pass mode to Pi if needed
+      body: JSON.stringify({ topic, mode }),
     });
 
     if (!response.ok) {
-      return c.json({ error: 'RAG service error' }, 500);
+      console.error(`[AgentGated] RAG Service Error: ${response.status}`);
+      return c.json({ error: 'RAG service unreachable' }, 500);
     }
 
-    // Set up SSE stream
+    // Proxy SSE stream
     c.header('Content-Type', 'text/event-stream');
     c.header('Cache-Control', 'no-cache');
     c.header('Connection', 'keep-alive');
@@ -416,10 +418,14 @@ app.post('/agent/:mode', async (c) => {
     });
 
   } catch (err: any) {
-    console.error('[AgentGated] Error:', err);
-    return c.json({ error: 'Failed to proxy request' }, 500);
+    console.error('[AgentGated] System Error:', err);
+    return c.json({ error: 'Internal server proxy error' }, 500);
   }
-});
+}
+
+app.post('/agent/full', (c) => handleAgentRequest(c, 'full'));
+app.post('/agent/query', (c) => handleAgentRequest(c, 'query'));
+
 
 // ────────────────────────────────────────────────────────────────────────────
 // 6. Start server (NON-BLOCKING)
