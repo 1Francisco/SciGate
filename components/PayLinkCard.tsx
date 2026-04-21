@@ -35,18 +35,28 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
   const [status, setStatus] = useState<'idle' | 'charging' | 'verifying' | 'unlocked' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [content, setContent] = useState<string | null>(null);
+  const [logs, setLogs] = useState<{msg: string, type: 'info' | 'success' | 'warn' | 'error', detail?: string}[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const addLog = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'info', detail?: string) => {
+    setLogs(prev => [...prev, { msg, type, detail }]);
+    console.log(`[x402 LOG] ${msg}`, detail || '');
+  };
 
   const handleUnlock = async () => {
     try {
       setStatus('charging');
       setErrorMsg('');
+      setShowLogs(true);
+      setLogs([]);
 
       // 1. Intentar acceder al recurso para obtener el desafío 402 si no lo tenemos
-      console.log(`[PayLink] Requesting access to paper ${paperId}...`);
+      addLog('Iniciando Handshake HTTP...', 'info', `GET ${serverUrl}/papers/${paperId}/full`);
       const initialRes = await fetch(`${serverUrl}/papers/${paperId}/full`);
       
       // Si el servidor ya nos da el contenido (ej. ya pagamos o bypass), lo mostramos
       if (initialRes.status === 200) {
+        addLog('Conexión establecida. Acceso directo concedido.', 'success');
         const data = await initialRes.json();
         setContent(data.full_text);
         setStatus('unlocked');
@@ -54,13 +64,20 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       }
 
       if (initialRes.status !== 402) {
+        addLog(`Error inesperado: HTTP ${initialRes.status}`, 'error');
         throw new Error(`Unexpected server response: ${initialRes.status}`);
       }
 
+      addLog('HTTP 402 Detectado: Pago Requerido.', 'warn');
+
       // 2. Parsear el desafío x402 (PAYMENT-REQUIRED header)
       const challengeHeader = initialRes.headers.get('PAYMENT-REQUIRED');
-      if (!challengeHeader) throw new Error('Payment challenge header missing');
+      if (!challengeHeader) {
+        addLog('Falta header PAYMENT-REQUIRED', 'error');
+        throw new Error('Payment challenge header missing');
+      }
       
+      addLog('Analizando Challenge x402...', 'info', challengeHeader);
       const challenge = JSON.parse(atob(challengeHeader)); // Decodificar Base64
       const exactScheme = challenge.accepts.find((a: any) => a.scheme === 'exact');
       
@@ -69,13 +86,15 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       const amountUnits = BigInt(exactScheme.amount);
       const recipient = exactScheme.payTo;
 
-      console.log(`[PayLink] Payment Required: ${exactScheme.amount} USDC to ${recipient}`);
+      addLog(`Challenge Decodificado: ${exactScheme.amount / 1e6} USDC -> ${recipient.slice(0,10)}...`, 'success');
 
       // 3. Ejecutar el pago con MiniKit
       if (!MiniKit.isInstalled()) {
+        addLog('MiniKit no detectado. Abre esto en World App.', 'error');
         throw new Error('Please open this link inside the World App to complete the payment.');
       }
 
+      addLog('Invocando SDK de Worldcoin (MiniKit)...', 'info');
       const txData = encodeFunctionData({
         abi: USDC_ABI,
         functionName: 'transfer',
@@ -94,9 +113,13 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       });
 
       const txId = (txResponse as any).data?.transactionId || (txResponse as any).data?.transactionHash;
-      if (!txId) throw new Error('Transaction cancelled or failed.');
+      if (!txId) {
+        addLog('Transacción cancelada por el usuario.', 'warn');
+        throw new Error('Transaction cancelled or failed.');
+      }
 
-      console.log(`[PayLink] Payment sent: ${txId}. Verifying...`);
+      addLog('Transacción Enviada!', 'success', txId);
+      addLog('Verificando pago on-chain...', 'info');
       setStatus('verifying');
 
       // 4. Re-intentar con la firma del pago (PAYMENT-SIGNATURE)
@@ -107,15 +130,18 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       });
 
       if (!finalRes.ok) {
+        addLog('Fallo en la verificación del servidor.', 'error');
         const errData = await finalRes.json().catch(() => ({}));
         throw new Error(errData.error || 'Payment verification failed on server.');
       }
 
+      addLog('Verificación Completada. ¡Acceso Total!', 'success');
       const finalData = await finalRes.json();
       setContent(finalData.full_text);
       setStatus('unlocked');
 
     } catch (err: any) {
+      addLog(`Fallo en el protocolo: ${err.message}`, 'error');
       console.error('[PayLink] Error:', err);
       setStatus('error');
       setErrorMsg(err.message || 'Payment process failed.');
@@ -181,6 +207,46 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:animate-shimmer"></div>
           )}
         </button>
+
+        {/* --- PROTOCOL HANDSHAKE VISUALIZER --- */}
+        {showLogs && (
+          <div className="mt-8 border-t border-white/5 pt-6 animate-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center justify-between mb-4">
+               <span className="text-[9px] font-black tracking-[2px] text-white/30 uppercase">Protocol Log</span>
+               <div className="flex gap-1">
+                 <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+                 <div className="w-1 h-1 rounded-full bg-green-500/40"></div>
+                 <div className="w-1 h-1 rounded-full bg-green-500/20"></div>
+               </div>
+            </div>
+            
+            <div className="space-y-3 max-h-48 overflow-y-auto no-scrollbar">
+              {logs.map((log, i) => (
+                <div key={i} className="flex gap-3 items-start group/log">
+                  <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                    log.type === 'success' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' :
+                    log.type === 'warn' ? 'bg-amber-500' :
+                    log.type === 'error' ? 'bg-red-500' : 'bg-indigo-500'
+                  }`} />
+                  <div className="flex flex-col gap-1">
+                    <p className={`text-[11px] font-bold ${
+                      log.type === 'success' ? 'text-green-400' :
+                      log.type === 'warn' ? 'text-amber-400' :
+                      log.type === 'error' ? 'text-red-400' : 'text-white/60'
+                    }`}>
+                      {log.msg}
+                    </p>
+                    {log.detail && (
+                      <p className="text-[9px] font-mono text-white/20 break-all leading-tight group-hover/log:text-white/40 transition-colors">
+                        {log.detail}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 flex items-center justify-center gap-2 opacity-20 group-hover:opacity-40 transition-opacity">
            <span className="text-[8px] uppercase tracking-[4px] font-bold text-white">Secure x402 Protocol</span>
