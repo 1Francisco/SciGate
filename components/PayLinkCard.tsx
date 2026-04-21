@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { parseUnits, encodeFunctionData } from 'viem';
+import HandshakeMap from './HandshakeMap';
 
 // Native USDC on World Chain (Mainnet)
 const USDC_ADDRESS = '0x79A02482A880bCe3F13E09da970dC34dB4cD24D1';
@@ -52,15 +53,16 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       setLogs([]);
 
       // 1. Intentar acceder al recurso para obtener el desafío 402 si no lo tenemos
-      const probeUrl = paperId === 'agent' 
+      const isAgent = paperId.startsWith('agent');
+      const probeUrl = isAgent 
         ? `${serverUrl}/agent/ask` 
         : `${serverUrl}/papers/${paperId}/full`;
 
-      addLog('Iniciando Handshake HTTP...', 'info', `GET ${probeUrl}`);
+      addLog(`Probing Protocol...`, 'info', `X-Handshake: ${probeUrl}`);
       
       const probeHeaders: any = { 'Content-Type': 'application/json' };
-      const probeBody = paperId === 'agent' ? JSON.stringify({ topic: 'probe' }) : undefined;
-      const probeMethod = paperId === 'agent' ? 'POST' : 'GET';
+      const probeBody = isAgent ? JSON.stringify({ topic: 'probe' }) : undefined;
+      const probeMethod = isAgent ? 'POST' : 'GET';
 
       const initialRes = await fetch(probeUrl, {
         method: probeMethod,
@@ -71,8 +73,10 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       // Si el servidor ya nos da el contenido (ej. ya pagamos o bypass), lo mostramos
       if (initialRes.status === 200) {
         addLog('Conexión establecida. Acceso directo concedido.', 'success');
-        const data = await initialRes.json();
-        if (paperId !== 'agent') setContent(data.full_text);
+        if (!isAgent) {
+          const data = await initialRes.json();
+          setContent(data.full_text);
+        }
         setStatus('unlocked');
         if (onUnlock) onUnlock('bypass');
         return;
@@ -138,7 +142,7 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       setStatus('verifying');
 
       // 4. Re-intentar con la firma del pago (PAYMENT-SIGNATURE)
-      const verifyUrl = paperId === 'agent' 
+      const verifyUrl = isAgent 
         ? `${serverUrl}/agent/ask` 
         : `${serverUrl}/papers/${paperId}/full`;
       
@@ -158,8 +162,10 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       }
 
       addLog('Verificación Completada. ¡Acceso Total!', 'success');
-      const finalData = await finalRes.json();
-      if (paperId !== 'agent') setContent(finalData.full_text);
+      if (!isAgent) {
+        const finalData = await finalRes.json();
+        setContent(finalData.full_text);
+      }
       setStatus('unlocked');
       if (onUnlock) onUnlock(txId);
 
@@ -241,52 +247,38 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
           </button>
         )}
 
+        {status === 'error' && (
+          <div className="p-4 bg-red-500/10 border border-red-500/10 rounded-xl text-red-400 text-[11px] mb-6 animate-shake font-medium flex gap-3 items-center">
+             <span className="text-lg">⚠️</span> {errorMsg}
+          </div>
+        )}
+
+        {status !== 'unlocked' && (
+          <button
+            onClick={handleUnlock}
+            disabled={status === 'charging' || status === 'verifying'}
+            className="w-full h-16 bg-white hover:bg-gray-100 disabled:bg-white/5 disabled:text-white/10 text-black font-black rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 relative overflow-hidden group/btn font-['Space_Grotesk'] text-sm tracking-widest mb-6"
+          >
+            {status === 'charging' ? 'INITIATING X402...' : 
+            status === 'verifying' ? 'FINAL HANDSHAKE...' : 
+            'PURCHASE NOW'}
+            
+            {(status === 'idle' || status === 'error') && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover/btn:animate-shimmer"></div>
+            )}
+          </button>
+        )}
+
         {/* --- PREMIUM PROTOCOL HANDSHAKE VISUALIZER --- */}
         {showLogs && (
-          <div className="mt-8 border-t border-white/5 pt-6 animate-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center justify-between mb-5">
-               <div className="flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                 <span className="text-[9px] font-black tracking-[3px] text-white/40 uppercase font-['Space_Grotesk']">Deep Protocol Log</span>
-               </div>
-               <div className="text-[9px] text-emerald-500/60 font-mono tracking-tighter">SECURE_NODE_ACTIVE</div>
-            </div>
-            
-            <div className="space-y-4 max-h-[220px] overflow-y-auto no-scrollbar pb-2">
-              {logs.map((log, i) => (
-                <div key={i} className="flex gap-4 items-start group/log animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${i * 0.1}s` }}>
-                  <div className={`mt-1.5 w-1 h-1 rounded-full shrink-0 ${
-                    log.type === 'success' ? 'bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,1)]' :
-                    log.type === 'warn' ? 'bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.5)]' :
-                    log.type === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-indigo-500/50'
-                  }`} />
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <p className={`text-[11px] font-bold tracking-tight ${
-                      log.type === 'success' ? 'text-emerald-400' :
-                      log.type === 'warn' ? 'text-amber-300' :
-                      log.type === 'error' ? 'text-red-400' : 'text-white/70'
-                    }`}>
-                      {log.msg}
-                    </p>
-                    {log.detail && (
-                      <div className="relative group/detail">
-                        <div className="absolute -left-2 top-0 bottom-0 w-[1px] bg-white/5 group-hover/detail:bg-indigo-500/20 transition-colors" />
-                        <p className="text-[9px] font-mono text-white/20 break-all leading-relaxed pl-2 group-hover/log:text-white/40 transition-colors uppercase tracking-tight">
-                          {log.detail}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div className="h-4" /> {/* Spacer */}
-            </div>
+          <div className="mt-4 animate-in slide-in-from-bottom-4 duration-700">
+            <HandshakeMap logs={logs} status={status} />
           </div>
         )}
 
         <div className="mt-8 flex items-center justify-center gap-3 opacity-10 group-hover:opacity-30 transition-all duration-500">
            <div className="w-8 h-[1px] bg-white/50"></div>
-           <span className="text-[8px] uppercase tracking-[6px] font-black text-white whitespace-nowrap font-['Space_Grotesk']">x402 Protocol v2.4</span>
+           <span className="text-[7px] uppercase tracking-[4px] font-black text-white whitespace-nowrap font-['Space_Grotesk']">x402 Protocol v2.5 L2-Secured</span>
            <div className="w-8 h-[1px] bg-white/50"></div>
         </div>
       </div>

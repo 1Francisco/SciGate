@@ -134,11 +134,19 @@ const routes = {
       mode: { type: 'free-trial' as const, uses: FREE_TRIAL_FULL },
     }),
   },
-  // $0.05 — Global Agent Access
-  'POST /agent/ask': {
+  // $0.05 — Full Agent Access
+  'POST /agent/full': {
     accepts: makeAccepts('0.05'),
     extensions: declareAgentkitExtension({
-      statement: 'Access the NanoClaw Global AI Researcher across all documents',
+      statement: 'Access the NanoClaw Global AI Researcher with full autonomous reasoning',
+      mode: { type: 'free-trial' as const, uses: 1 },
+    }),
+  },
+  // $0.01 — Quick Inquiry
+  'POST /agent/query': {
+    accepts: makeAccepts('0.01'),
+    extensions: declareAgentkitExtension({
+      statement: 'Single precision inquiry to the NanoClaw autonomous agent',
       mode: { type: 'free-trial' as const, uses: 1 },
     }),
   },
@@ -369,18 +377,19 @@ app.get('/papers/:id/data', async (c) => {
 });
 
 // ── Global Agent Proxy (Gated) ──────────────────────────────────────────────
-app.post('/agent/ask', async (c) => {
+app.post('/agent/:mode', async (c) => {
+  const mode = c.req.param('mode'); // query or full
   try {
     const { topic } = await c.req.json();
     const { RAG_SERVICE_URL } = await import('./config.js');
 
-    console.log(`[AgentGated] Proxying to Pi: ${RAG_SERVICE_URL}/ask-agent`);
+    console.log(`[AgentGated][${mode}] Proxying to Pi: ${RAG_SERVICE_URL}/ask-agent`);
 
     // Connect to Raspberry Pi RAG
     const response = await fetch(`${RAG_SERVICE_URL}/ask-agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, mode }), // Pass mode to Pi if needed
     });
 
     if (!response.ok) {

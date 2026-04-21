@@ -62,14 +62,28 @@ papers.get('/:id/metadata', async (c) => {
   const id = c.req.param('id') as `0x${string}`;
 
   // 0. SPECIAL CASE: Virtual Agent Metadata
-  if (id === 'agent' as any) {
+  if (id === 'agent-query' as any) {
     return c.json({
-      contentHash: 'agent',
+      contentHash: 'agent-query',
       author: PAY_TO_ADDRESS,
-      title: 'NanoClaw Global AI Researcher',
-      description: 'Access the autonomous research agent across the entire document catalog.',
+      title: 'NanoClaw Quick Inquiry',
+      description: 'Single high-precision inquiry to the autonomous researcher.',
+      pricePerQuery: '10000', // $0.01
+      pricePerFull: '10000',  
+      active: true,
+      source: 'virtual',
+      isAgent: true
+    });
+  }
+
+  if (id === 'agent-full' as any || id === 'agent' as any) {
+    return c.json({
+      contentHash: 'agent-full',
+      author: PAY_TO_ADDRESS,
+      title: 'NanoClaw Alpha Researcher',
+      description: 'Full autonomous loop with multi-source synthesis.',
       pricePerQuery: '50000', // $0.05
-      pricePerFull: '50000',  // Single access price
+      pricePerFull: '50000', 
       active: true,
       source: 'virtual',
       isAgent: true
