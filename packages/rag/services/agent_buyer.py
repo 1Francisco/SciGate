@@ -3,7 +3,7 @@ import httpx
 from typing import List, Dict, Any
 from .x402_handler import x402_handler
 
-SCIGATE_API_URL = os.getenv("SCIGATE_API_URL", "http://localhost:3000")
+SCIGATE_API_URL = os.getenv("SCIGATE_API_URL", "https://scigate.onrender.com")
 
 async def search_and_buy_context(query: str, limit: int = 3) -> List[Dict[str, Any]]:
     """
@@ -13,7 +13,7 @@ async def search_and_buy_context(query: str, limit: int = 3) -> List[Dict[str, A
     
     # 1. Search across all papers
     async with httpx.AsyncClient() as client:
-        search_resp = await client.get(f"{SCIGATE_API_URL}/search", params={"q": query})
+        search_resp = await client.get(f"{SCIGATE_API_URL}/papers/search", params={"q": query})
         if search_resp.status_code != 200:
             return []
         

@@ -34,7 +34,7 @@ export const WORLD_ID_RP_ID  = process.env.WORLD_ID_RP_ID  ?? '';
 export const WORLD_ID_SIGNING_KEY = process.env.WORLD_ID_SIGNING_KEY ?? '';
 
 // ── RAG Engine ───────────────────────────────────────────────
-export const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'http://100.95.133.124:10000';
+export const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'https://nonenthusiastic-trochoidal-dovie.ngrok-free.dev';
 
 // ── Prices (in USD) ──────────────────────────────────────────
 export const PRICES = {
