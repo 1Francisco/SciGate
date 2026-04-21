@@ -318,17 +318,37 @@ export default function UploadPage() {
               <div style={{ fontSize: 72, marginBottom: 24 }}>🎉</div>
               <h2 style={{ marginBottom: 16 }}>Success!</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>Your paper is now registered on World Chain Mainnet.</p>
-              {uploadResult.txHash && (
-                <a 
-                  href={`https://worldscan.org/tx/${uploadResult.txHash}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--accent-indigo)', fontSize: 13, display: 'block', marginBottom: 32 }}
-                >
-                  View on WorldScan ↗
-                </a>
+              {uploadResult.paper_id && (
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 16, 
+                  border: '1px solid var(--border)', marginBottom: 32, textAlign: 'left' 
+                }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase' }}>Direct PayLink (Share this!)</p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input 
+                      readOnly 
+                      className="input" 
+                      value={`${window.location.origin}/pay/${uploadResult.paper_id}`} 
+                      style={{ flex: 1, fontSize: 11, background: 'rgba(0,0,0,0.2)' }}
+                    />
+                    <button 
+                      className="btn-primary" 
+                      style={{ padding: '8px 16px', fontSize: 11 }}
+                      onClick={() => {
+                        const url = `${window.location.origin}/pay/${uploadResult.paper_id}`;
+                        navigator.clipboard.writeText(url);
+                        alert('¡Link copiado!');
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
               )}
-              <Link href="/dashboard" className="btn-primary">View Dashboard</Link>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <Link href="/dashboard" className="btn-secondary">View Dashboard</Link>
+                <Link href="/explore" className="btn-primary">Go to Explore</Link>
+              </div>
             </div>
           )}
         </div>

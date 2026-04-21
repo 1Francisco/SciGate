@@ -381,6 +381,31 @@ export default function ExplorePage() {
                       }}></div>
                     </div>
 
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                        <button 
+                          className="btn-secondary" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = `${window.location.origin}/pay/${getPaperId(paper)}`;
+                            navigator.clipboard.writeText(url);
+                            alert('¡Link de pago copiado al portapapeles!');
+                          }}
+                          style={{ padding: '6px 12px', fontSize: 11, flex: 1 }}
+                        >
+                          🔗 Copiar PayLink
+                        </button>
+                        <button 
+                          className="btn-primary" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPaper(isSelected ? null : paper);
+                          }}
+                          style={{ padding: '6px 12px', fontSize: 11, flex: 1, background: isSelected ? 'var(--text-muted)' : 'var(--accent-indigo)' }}
+                        >
+                          {isSelected ? 'Cerrar' : 'Preguntar IA'}
+                        </button>
+                    </div>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'monospace' }}>
                         Hash: {getPaperId(paper).slice(0, 16)}...
