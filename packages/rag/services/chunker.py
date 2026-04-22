@@ -8,6 +8,7 @@ SECTION_HEADERS = [
     "future work", "acknowledgements", "acknowledgments", "references",
 ]
 
+
 def split_text(
     full_text: str,
     paper_id: str,
@@ -16,34 +17,23 @@ def split_text(
     chunk_overlap: int = 200,
 ) -> list[dict[str, Any]]:
     """
-    Split paper text into chunks using a simple native Python splitter (no LangChain needed).
-    Each chunk carries paper_id, chunk_index, and approximate page number.
+    Split paper text into chunks. Each chunk carries paper_id, chunk_index,
+    and an accurate page number derived from the exact character offset in `full_text`.
     """
-    
-    # Simple recursive-like splitter implementation
-    raw_chunks = []
-    start = 0
-    while start < len(full_text):
-        end = start + chunk_size
-        if end > len(full_text):
-            end = len(full_text)
-        
-        chunk = full_text[start:end]
-        raw_chunks.append(chunk)
-        
-        if end == len(full_text):
-            break
-        start = end - chunk_overlap
+    if not full_text:
+        return []
 
-    # Build a rough page lookup: character offset → page number
+    # Page offsets must be computed exactly against the string we chunk.
+    # full_text is assumed to be the concatenation of page texts joined by "\n"
+    # (one newline between pages). +1 accounts for that delimiter.
     page_offsets: list[tuple[int, int]] = []
     offset = 0
     for page in pages:
         page_offsets.append((offset, page["page"]))
-        offset += len(page["text"])
+        offset += len(page["text"]) + 1  # +1 for the "\n" join separator
 
-    def get_page(char_offset: int) -> int:
-        page_num = 1
+    def page_for(char_offset: int) -> int:
+        page_num = pages[0]["page"] if pages else 1
         for (start_off, pnum) in page_offsets:
             if char_offset >= start_off:
                 page_num = pnum
@@ -51,19 +41,28 @@ def split_text(
                 break
         return page_num
 
-    chunks = []
-    char_offset = 0
-    for idx, chunk_text in enumerate(raw_chunks):
+    chunks: list[dict[str, Any]] = []
+    start = 0
+    idx = 0
+    text_len = len(full_text)
+
+    while start < text_len:
+        end = min(start + chunk_size, text_len)
+        chunk_text = full_text[start:end]
         chunks.append({
             "paper_id": paper_id,
             "chunk_index": idx,
             "text": chunk_text,
-            "page": get_page(char_offset),
-            "char_offset": char_offset,
+            "page": page_for(start),
+            "char_offset": start,
         })
-        char_offset += len(chunk_text) - chunk_overlap
+        idx += 1
+        if end == text_len:
+            break
+        start = end - chunk_overlap
 
     return chunks
+
 
 def detect_sections(full_text: str) -> list[dict[str, Any]]:
     """Detect section headers in the paper text."""
@@ -74,7 +73,6 @@ def detect_sections(full_text: str) -> list[dict[str, Any]]:
 
     for line in lines:
         stripped = line.strip().lower()
-        # Check if this line looks like a section header
         matched = None
         for header in SECTION_HEADERS:
             pattern = rf"^(\d+\.?\s+)?{re.escape(header)}[\s:]*$"
@@ -93,9 +91,7 @@ def detect_sections(full_text: str) -> list[dict[str, Any]]:
             current_content = []
         elif current_section:
             current_content.append(line)
-        else:
-            # Lines before the first section (e.g. title/authors)
-            pass
+        # else: lines before the first section (title/authors) are dropped
 
     if current_section:
         sections.append({

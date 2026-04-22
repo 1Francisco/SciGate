@@ -1,7 +1,0 @@
-{
-  "transactions": [
-    {
-      "rpc": "https://worldchain-sepolia.g.alchemy.com/public"
-    }
-  ]
-}

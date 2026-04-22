@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  web-typecheck:
+    name: Web · typecheck + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  server-typecheck:
+    name: Server · typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  rag-test:
+    name: RAG · python import smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/rag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      # Import-only smoke test (no secrets required). Skips the agent buyer singleton.
+      - run: |
+          python -c "
+          import importlib
+          for m in ['services.chunker', 'services.pdf_parser']:
+              importlib.import_module(m)
+          print('✅ basic imports ok')
+          "
+
+  contracts-test:
+    name: Contracts · forge test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge install --shallow || true
+      - run: forge build
+      - run: forge test -vvv

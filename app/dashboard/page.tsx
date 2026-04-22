@@ -8,6 +8,7 @@ import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS;
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 const MOCK_PAPERS = [
   { contentHash: '0xabcd1234...', title: 'Attention Is All You Need', totalEarnings: '145000', totalAccesses: 14, active: true },
@@ -175,12 +176,25 @@ export default function DashboardPage() {
                 </div>
               )}
               
-              <button
-                onClick={() => { setWalletAddress('0x0000000000000000000000000000000000000001'); setTimeout(loadDashboard, 0); }}
-                style={{ marginTop: 24, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}
-              >
-                Use demo data for presentation
-              </button>
+              {DEMO_MODE && (
+                <button
+                  onClick={() => {
+                    setWalletAddress('0x0000000000000000000000000000000000000001');
+                    setTimeout(loadDashboard, 0);
+                  }}
+                  style={{
+                    marginTop: 24,
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Use demo data for presentation
+                </button>
+              )}
             </div>
           )}
 
@@ -194,8 +208,28 @@ export default function DashboardPage() {
           {walletAddress && !loading && (
             <>
               {useMock && (
-                <div style={{ padding: '10px 16px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--accent-amber)', fontSize: 13, marginBottom: 24 }}>
-                  📊 Showing demo data — connect your real wallet to see live earnings from PaperRegistry
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    background: 'rgba(245,158,11,0.12)',
+                    border: '2px solid rgba(245,158,11,0.4)',
+                    borderRadius: 'var(--radius-md)',
+                    color: '#fbbf24',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    marginBottom: 24,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>⚠️</span>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>Demo data — not your real earnings</div>
+                    <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+                      These numbers are fabricated for presentation purposes. Connect your real wallet to see on-chain data.
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -14,10 +14,11 @@ const WorldIDVerify = dynamic(
 );
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
-const RAG_URL  = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
-const WORLD_APP_ID    = process.env.NEXT_PUBLIC_WORLD_APP_ID    ?? 'app_staging_placeholder';
+const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
+const WORLD_APP_ID = process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? 'verify-author';
-const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS;
+const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? '';
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -145,22 +146,28 @@ export default function UploadPage() {
         throw new Error('MiniKit is not installed. On-chain registration requires the World App.');
       }
 
+      if (!PAPER_REGISTRY_ADDRESS || !/^0x[0-9a-fA-F]{40}$/.test(PAPER_REGISTRY_ADDRESS)) {
+        throw new Error(
+          'PaperRegistry contract address not configured. Set NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS to a deployed contract.'
+        );
+      }
+
       const calldata = encodeFunctionData({
         abi: PAPER_REGISTRY_ABI,
         functionName: 'registerPaper',
         args: [
           contentHash as `0x${string}`,
-          `ipfs://placeholder/${paperIdStr}`, 
+          `ipfs://placeholder/${paperIdStr}`,
           priceQueryUnits,
           priceFullUnits,
-          trainingPrice
+          trainingPrice,
         ],
       });
 
       const response = await MiniKit.sendTransaction({
         transactions: [
           {
-            to: (PAPER_REGISTRY_ADDRESS || '0x497f0a9304e22bbd2954774e48e2d27d787c5529') as `0x${string}`,
+            to: PAPER_REGISTRY_ADDRESS as `0x${string}`,
             data: calldata,
             value: '0',
           },
@@ -245,9 +252,11 @@ export default function UploadPage() {
               <h2 style={{ fontSize: 24, marginBottom: 8 }}>🪪 Author Verification</h2>
               
               {!walletConfirmed ? (
-                miniKitNotInstalled ? (
+                miniKitNotInstalled && DEMO_MODE ? (
                   <div style={{ margin: '32px 0' }}>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>Manual Fallback (Testing Mode):</p>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+                      ⚠️ Demo mode — manual wallet entry:
+                    </p>
                     <input
                       className="input"
                       value={walletAddress}
@@ -255,9 +264,20 @@ export default function UploadPage() {
                       placeholder="Your Wallet Address (0x...)"
                       style={{ marginBottom: 16, width: '100%' }}
                     />
-                    <button className="btn-primary" onClick={() => setWalletConfirmed(true)} disabled={!walletAddress} style={{ width: '100%', padding: '16px' }}>
+                    <button
+                      className="btn-primary"
+                      onClick={() => setWalletConfirmed(true)}
+                      disabled={!/^0x[0-9a-fA-F]{40}$/.test(walletAddress)}
+                      style={{ width: '100%', padding: '16px' }}
+                    >
                       Confirm Wallet →
                     </button>
+                  </div>
+                ) : miniKitNotInstalled ? (
+                  <div style={{ margin: '32px 0', padding: 20, background: 'rgba(239,68,68,0.08)', borderRadius: 12 }}>
+                    <p style={{ color: '#f87171', fontSize: 14 }}>
+                      World App not detected. Open this page inside the World App to publish.
+                    </p>
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', margin: '32px 0' }}>

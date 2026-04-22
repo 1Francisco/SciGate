@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
+const allowedDevOrigins = (process.env.NEXT_PUBLIC_ALLOWED_DEV_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const nextConfig = {
   reactStrictMode: true,
-  allowedDevOrigins: ['nonenthusiastic-trochoidal-dovie.ngrok-free.dev'],
-  // Allow cross-origin requests to local dev servers
+  ...(allowedDevOrigins.length ? { allowedDevOrigins } : {}),
   async headers() {
     return [
       {

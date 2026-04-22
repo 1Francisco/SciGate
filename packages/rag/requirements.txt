@@ -2,14 +2,21 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 python-multipart==0.0.18
 PyMuPDF==1.25.1
-langchain==0.3.14
-langchain-google-genai==2.0.8
-langchain-community==0.3.14
 google-generativeai==0.8.3
 python-dotenv==1.0.1
 httpx==0.28.1
 numpy<2.0.0
-x402[httpx,evm]>=0.2.0
+
+# x402 SDK (match x402_handler.py imports: mechanisms.evm.exact, mechanisms.svm.exact)
+x402[httpx,evm,svm]>=2.8.0
+
+# EVM
 web3>=6.0.0
 eth-account>=0.8.0
+
+# Solana (optional — only needed for agent buyer with RAG_AGENT_SOLANA_KEY)
+solders>=0.21.0
+
+# Supabase vector store
 supabase==2.11.0
+pgvector>=0.2.0

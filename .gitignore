@@ -1,29 +1,49 @@
-# Dependencias
+# ── Dependencies ────────────────────────────────────────────────
 node_modules/
+.pnp.*
 venv/
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
 
-# Secretos (MUY IMPORTANTE)
+# ── Secrets ─────────────────────────────────────────────────────
 .env
 .env.local
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 .env.staging
+.env.production
 
-# Build / Next.js
+# ── Next.js build ───────────────────────────────────────────────
 .next/
 out/
-dist/
 build/
+dist/
 
-# IDEs
+# ── Foundry build ───────────────────────────────────────────────
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+
+# ── RAG runtime data (mutable, NOT code) ────────────────────────
+packages/rag/chroma_db/
+packages/rag/uploads/
+
+# ── IDEs ────────────────────────────────────────────────────────
 .vscode/
 .idea/
 .DS_Store
+Thumbs.db
 
-# Logs
+# ── Logs ────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# ── Hackathon mock data ─────────────────────────────────────────
+mock_db.json
+tsconfig.tsbuildinfo
