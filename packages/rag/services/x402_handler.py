@@ -3,43 +3,59 @@ import asyncio
 from eth_account import Account
 from x402 import x402Client
 from x402.mechanisms.evm.exact import ExactEvmScheme
-from x402.signers.evm.account import LocalAccountSigner
-from dotenv import load_dotenv
+from x402.mechanisms.svm.exact import ExactSvmScheme
 
-load_dotenv()
+# --- NUEVOS IMPORTS PARA LA VERSIÓN 2.8.0 ---
+from x402.mechanisms.evm.signers import EthAccountSigner
+from x402.mechanisms.svm.signers import KeypairSigner
+
+# Soporte para carga de llaves de Solana
+try:
+    from solders.keypair import Keypair
+except ImportError:
+    Keypair = None
 
 class AutonomousX402Handler:
-    """
-    Handles autonomous payments using the x402 protocol for Python clients.
-    Uses the RAG_AGENT_PRIVATE_KEY to sign transactions on World Chain.
-    """
     def __init__(self):
-        private_key = os.getenv("RAG_AGENT_PRIVATE_KEY") or os.getenv("PRIVATE_KEY")
-        if not private_key:
-            raise ValueError(
-                "❌ MISSING AGENT PRIVATE KEY: RAG_AGENT_PRIVATE_KEY is not defined in .env. "
-                "The researcher agent needs a wallet with funds to buy context autonomously."
-            )
-        
-        # Initialize the EVM account and signer
-        self.account = Account.from_key(private_key)
-        self.signer = LocalAccountSigner(self.account)
-        
-        # Initialize x402 client
+        print("\n🛰️  SciGate: Inicializando Sistemas de Pago...")
+
+        # 1. Configuración del Cliente x402
+        # En v2.8.0, el cliente descubre el facilitador desde los headers del servidor.
         self.client = x402Client()
-        
-        # Register EVM scheme for World Chain Mainnet (eip155:480)
-        # We use a wildcard eip155:* or specific 480
-        self.client.register("eip155:480", ExactEvmScheme(signer=self.signer))
-        self.client.register("eip155:4801", ExactEvmScheme(signer=self.signer)) # Also support Sepolia for testing
+
+        # 2. Configuración World Chain (EVM)
+        evm_key = os.getenv("RAG_AGENT_PRIVATE_KEY") or os.getenv("PRIVATE_KEY")
+        if evm_key:
+            try:
+                account = Account.from_key(evm_key)
+                self.client.register("eip155:480", ExactEvmScheme(signer=EthAccountSigner(account)))
+                print(f"✅ World Chain ID: {account.address}")
+            except Exception as e:
+                print(f"❌ Error en Llave EVM: {str(e)}")
+
+        # 3. Configuración Solana (SVM)
+        sol_key = os.getenv("RAG_AGENT_SOLANA_KEY")
+        if sol_key and Keypair:
+            try:
+                kp = Keypair.from_base58_string(sol_key)
+                sol_signer = KeypairSigner(kp)
+                
+                # Genesis Hash oficial de Solana Mainnet
+                self.client.register(
+                    "solana:5eykt4UsFv8P8NJdTREpY1vzqAQZSSfL",
+                    ExactSvmScheme(signer=sol_signer)
+                )
+                print(f"✅ Solana Address: {kp.pubkey()}")
+            except Exception as e:
+                print(f"❌ Error en Llave Solana: {str(e)}")
+
+        print("------------------------------------------\n")
 
     async def get(self, url: str, headers: dict = None):
-        """Perform an autonomous GET request with x402 support."""
         return await self.client.get(url, headers=headers)
 
     async def post(self, url: str, json: dict = None, headers: dict = None):
-        """Perform an autonomous POST request with x402 support."""
         return await self.client.post(url, json=json, headers=headers)
 
-# Singleton instance
+# Instancia única para usar en toda la aplicación (Singleton)
 x402_handler = AutonomousX402Handler()
