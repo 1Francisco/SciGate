@@ -69,12 +69,30 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       }
 
       if (initialRes.status === 402) {
+        // The server sends PAYMENT-REQUIRED as plain JSON (not base64).
+        // Fall back to parsing the body if the header is missing or truncated.
         const header = initialRes.headers.get('PAYMENT-REQUIRED');
+        let decoded: any = null;
         if (header) {
-          const decoded = JSON.parse(atob(header));
+          try {
+            decoded = JSON.parse(header);
+          } catch {
+            try {
+              decoded = JSON.parse(atob(header));
+            } catch {
+              decoded = null;
+            }
+          }
+        }
+        if (!decoded) {
+          decoded = await initialRes.json().catch(() => null);
+        }
+        if (decoded) {
           setChallenge(decoded);
           addLog('Multi-chain challenge received.', 'success');
           setStatus('idle');
+        } else {
+          throw new Error('Unable to parse 402 challenge');
         }
       } else {
         throw new Error(`Server returned ${initialRes.status}`);
@@ -160,9 +178,12 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
     }
   };
 
-  const currentScheme = challenge?.accepts?.find((a: any) => 
-    selectedNetwork === 'world' ? a.network.includes('155') : a.network.includes('solana')
-  );
+  const currentScheme = challenge?.accepts?.find((a: any) => {
+    const net = String(a.network ?? '').toLowerCase();
+    return selectedNetwork === 'world'
+      ? net.startsWith('eip155:')
+      : net.startsWith('solana:');
+  });
 
   return (
     <div className="card w-full max-w-md relative overflow-hidden group">

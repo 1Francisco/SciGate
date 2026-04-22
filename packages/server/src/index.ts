@@ -1,19 +1,11 @@
+import 'dotenv/config';
 import { Hono, MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { stream } from 'hono/streaming';
 import { serve } from '@hono/node-server';
 
-console.log(`[CONFIG] Node Version: ${process.version}`);
-console.log(`[CONFIG] Current Dir: ${process.cwd()}`);
-console.log(`[CONFIG] Render Port: ${process.env.PORT || '3001 (default)'}`);
-
-// ############################################################
-// #   SCIGATE FORCED UPDATE V2.0.2 - X402 INITIALIZATION FIX  #
-// ############################################################
-
 import { HTTPFacilitatorClient } from '@x402/core/http';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
-import { Network } from '@x402/core/types';
 import {
   paymentMiddlewareFromHTTPServer,
   x402HTTPResourceServer,
@@ -28,8 +20,9 @@ import {
 } from '@worldcoin/agentkit';
 
 import {
+  DEMO_MODE,
+  IS_PRODUCTION,
   WORLD_CHAIN,
-  BASE,
   SOLANA,
   WORLD_USDC,
   SOLANA_USDC,
@@ -41,36 +34,49 @@ import {
   PRICES,
   FREE_TRIAL_QUERY,
   FREE_TRIAL_FULL,
+  DEBUG_LOG_TOKEN,
+  WORLD_ID_SIGNING_KEY,
+  WORLD_ID_RP_ID,
 } from './config.js';
 
-import { papers, handleQuery, handleSection, handleCitations, handleFull, handleData } from './routes/papers.js';
+import {
+  papers,
+  handleQuery,
+  handleSection,
+  handleCitations,
+  handleFull,
+  handleData,
+  handlePreview,
+} from './routes/papers.js';
 import { authors } from './routes/authors.js';
 import { signRequest } from '@worldcoin/idkit-server';
-import { WORLD_ID_SIGNING_KEY, WORLD_ID_RP_ID } from './config.js';
-import { savePaperMetadata, getPaperMetadata } from './services/supabase.js';
+import { getPaperMetadata, incrementTrial, type TrialKind } from './services/supabase.js';
+import { getPaperFromChain, recordAccess } from './services/contract.js';
+import { verifyUsdcPayment } from './services/payment.js';
+import { rateLimit } from './services/rateLimit.js';
+
+console.log('\n────────────────────────────────────────');
+console.log(`  SciGate x402 Gateway`);
+console.log(`  Node:   ${process.version}`);
+console.log(`  Env:    ${IS_PRODUCTION ? 'production' : 'development'}`);
+console.log(`  Demo:   ${DEMO_MODE ? '⚠️  ENABLED' : 'disabled'}`);
+console.log(`  Port:   ${PORT}`);
+console.log('────────────────────────────────────────\n');
 
 // ────────────────────────────────────────────────────────────────────────────
-// 1. x402 Setup: ExactEvmScheme + World Chain USDC money parser
+// 1. x402 Setup
 // ────────────────────────────────────────────────────────────────────────────
-const evmScheme = new ExactEvmScheme()
-  .registerMoneyParser(async (amount, network) => {
-    if (network !== WORLD_CHAIN) return null;
-    return {
-      amount: String(Math.round(parseFloat(amount as any) * 1e6)),
-      asset: WORLD_USDC,
-    };
-  });
-
-// ────────────────────────────────────────────────────────────────────────────
-// 2. Facilitator — World Chain
-// ────────────────────────────────────────────────────────────────────────────
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: WORLD_FACILITATOR_URL,
+const evmScheme = new ExactEvmScheme().registerMoneyParser(async (amount, network) => {
+  if (network !== WORLD_CHAIN) return null;
+  return {
+    amount: String(Math.round(parseFloat(amount as any) * 1e6)),
+    asset: WORLD_USDC,
+  };
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// 3. AgentKit: AgentBook verifier + in-memory storage + hooks
-// ────────────────────────────────────────────────────────────────────────────
+const facilitatorClient = new HTTPFacilitatorClient({ url: WORLD_FACILITATOR_URL });
+
+// ── AgentKit free-trial hooks (for the x402 SDK path) ──────────────────────
 const agentBook = createAgentBookVerifier({ network: 'world' });
 const storage = new InMemoryAgentKitStorage();
 
@@ -80,27 +86,15 @@ const hooksQuery = createAgentkitHooks({
   mode: { type: 'free-trial', uses: FREE_TRIAL_QUERY },
 });
 
-const hooksFull = createAgentkitHooks({
-  agentBook,
-  storage,
-  mode: { type: 'free-trial', uses: FREE_TRIAL_FULL },
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-// 4. x402 Resource Server
-// ────────────────────────────────────────────────────────────────────────────
 const resourceServer = new x402ResourceServer(facilitatorClient)
   .register(WORLD_CHAIN, evmScheme)
   .registerExtension(agentkitResourceServerExtension);
 
-// ── Payment acceptors for each price tier ──────────────────────────────────
 const makeAccepts = (price: string) => [
   { scheme: 'exact' as const, price, network: WORLD_CHAIN, payTo: PAY_TO_ADDRESS },
 ];
 
-// ── Route declarations with free-trial extensions ──────────────────────────
 const routes = {
-  // $0.01 — 3 free uses
   'POST /papers/:id/query': {
     accepts: makeAccepts(PRICES.query),
     extensions: declareAgentkitExtension({
@@ -122,7 +116,6 @@ const routes = {
       mode: { type: 'free-trial' as const, uses: FREE_TRIAL_QUERY },
     }),
   },
-  // $0.10 — 1 free use
   'GET /papers/:id/full': {
     accepts: makeAccepts(PRICES.full),
     extensions: declareAgentkitExtension({
@@ -130,7 +123,6 @@ const routes = {
       mode: { type: 'free-trial' as const, uses: FREE_TRIAL_FULL },
     }),
   },
-  // $0.15 — 1 free use
   'GET /papers/:id/data': {
     accepts: makeAccepts(PRICES.data),
     extensions: declareAgentkitExtension({
@@ -138,7 +130,6 @@ const routes = {
       mode: { type: 'free-trial' as const, uses: FREE_TRIAL_FULL },
     }),
   },
-  // $0.05 — Full Agent Access
   'POST /agent/full': {
     accepts: makeAccepts('0.05'),
     extensions: declareAgentkitExtension({
@@ -146,7 +137,6 @@ const routes = {
       mode: { type: 'free-trial' as const, uses: 1 },
     }),
   },
-  // $0.01 — Quick Inquiry
   'POST /agent/query': {
     accepts: makeAccepts('0.01'),
     extensions: declareAgentkitExtension({
@@ -156,255 +146,293 @@ const routes = {
   },
 };
 
-// ── Build the HTTP server with hooks ───────────────────────────────────────
-const httpServer = new x402HTTPResourceServer(resourceServer, routes)
-  .onProtectedRequest(hooksQuery.requestHook as any);
+const httpServer = new x402HTTPResourceServer(resourceServer, routes).onProtectedRequest(
+  hooksQuery.requestHook as any
+);
 
 // ────────────────────────────────────────────────────────────────────────────
-// 5. Hono App
+// 2. Hono app
 // ────────────────────────────────────────────────────────────────────────────
 const app = new Hono();
 
-app.use('*', cors({
-  origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'x-payment-proof'],
-  exposeHeaders: ['PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
-}));
+app.use(
+  '*',
+  cors({
+    origin: IS_PRODUCTION ? (origin) => origin ?? '' : '*',
+    allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'x-payment-proof', 'x-user-id'],
+    exposeHeaders: ['PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
+  })
+);
 
-// ── Mobile Debug & Health Check ───────────────────────────────────────────
-app.get('/health', (c) => {
-  console.log('--- [HEALTH CHECK] Hit received at ' + new Date().toISOString() + ' ---');
-  return c.json({ status: 'ok', service: 'scigate-server', v: '2.2.0', env: 'production' });
+// Request id + structured log line
+app.use('*', async (c, next) => {
+  const id = crypto.randomUUID().slice(0, 8);
+  (c as any).set?.('reqId', id);
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  console.log(`[${id}] ${c.req.method} ${c.req.path} → ${c.res.status} (${ms}ms)`);
 });
 
+// ── Health ───────────────────────────────────────────────────
+app.get('/health', (c) =>
+  c.json({
+    status: 'ok',
+    service: 'scigate-server',
+    version: '2.1.0',
+    env: IS_PRODUCTION ? 'production' : 'development',
+    demo: DEMO_MODE,
+  })
+);
+
+// ── /debug/log (authenticated) ───────────────────────────────
 app.post('/debug/log', async (c) => {
+  if (!DEBUG_LOG_TOKEN) {
+    return c.json({ error: 'debug logging disabled' }, 404);
+  }
+  const auth = c.req.header('authorization') ?? '';
+  const token = auth.replace(/^Bearer\s+/i, '');
+  if (token !== DEBUG_LOG_TOKEN) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
   try {
     const body = await c.req.json();
-    console.log(`📱 [MOBILE_LOG][${body.type || 'DEBUG'}]`, JSON.stringify(body.data || body, null, 2));
+    console.log(`[mobile][${body.type ?? 'DEBUG'}]`, JSON.stringify(body.data ?? body));
     return c.json({ logged: true });
-  } catch (err) {
+  } catch {
     return c.json({ ok: false }, 400);
   }
 });
 
+// ── Rate limit everything except health ──────────────────────
 app.use('*', async (c, next) => {
-  console.log(`🚢 [${new Date().toISOString().split('T')[1].split('.')[0]}] ${c.req.method} ${c.req.path}`);
-  await next();
+  if (c.req.path === '/health' || c.req.path === '/') return next();
+  return rateLimit()(c, next);
 });
 
-// ── Manual x402 Middleware (with Trial & Bypass) ──────────────────────────
-import { HonoAdapter } from '@x402/hono';
+// ────────────────────────────────────────────────────────────────────────────
+// 3. Payment middleware
+// ────────────────────────────────────────────────────────────────────────────
 
-const trialTracker = new Map<string, number>();
-const FREE_TRIAL_LIMIT = 1;
-
-const manualX402Middleware: MiddlewareHandler = async (c, next) => {
-  const context = {
-    adapter: new HonoAdapter(c),
-    path: c.req.path,
-    method: c.req.method,
-  };
-
-  console.log(`[x402][Debug] Middleware Hit: ${c.req.method} ${c.req.path}`);
-
-  // 1. Check if route requires payment
-  if (!httpServer.requiresPayment(context)) {
-    return await next();
-  }
-
-  // 2. HACKATHON BYPASS: If client sends a payment proof header, skip the challenge
-  const paymentProof = c.req.header('x-payment-proof') || c.req.header('PAYMENT-SIGNATURE');
-  if (paymentProof && (paymentProof.length > 5 || paymentProof === 'demo_bypass' || paymentProof === 'bypass')) {
-    console.log(`[x402] Payment bypass triggered: ${paymentProof.slice(0, 8)}... Unlocking request.`);
-    return await next();
-  }
-
-  // 3. FREE TRIAL CHECK
-  const userId = c.req.header('x-user-id') || c.req.header('cf-connecting-ip') || 'anonymous';
-  const currentUses = trialTracker.get(userId) || 0;
-
-  if (currentUses < FREE_TRIAL_LIMIT) {
-    console.log(`[TRIAL] User ${userId} used ${currentUses + 1}/${FREE_TRIAL_LIMIT} free queries.`);
-    trialTracker.set(userId, currentUses + 1);
-    return await next();
-  }
-
-  // 4. LIMIT REACHED -> Challenge with x402 or Manual Fallback
-  console.warn(`[TRIAL] User ${userId} limit reached. Issuing challenge.`);
+/**
+ * Resolves the expected payee and price for a paper-scoped request.
+ * Preference: on-chain (canonical) → Supabase (cache) → global fallback.
+ */
+async function resolvePaymentTarget(paperId: string, kind: TrialKind): Promise<{
+  payTo: `0x${string}`;
+  amount: bigint;
+}> {
+  const defaultAmount = kind === 'full' ? 100_000n : 10_000n; // 6-decimal USDC
+  let payTo = PAY_TO_ADDRESS as `0x${string}`;
+  let amount = defaultAmount;
 
   try {
-    // Attempt standard x402 processing first
-    const result = await httpServer.processHTTPRequest(context);
-    
-    if (result.type === 'payment-error') {
-      const { status, headers, body, isHtml } = result.response;
-      if (isHtml) {
-        return c.html(body as string, status as any, headers);
-      }
-      return c.json(body, status as any, headers);
+    const onchain = await getPaperFromChain(paperId as `0x${string}`);
+    if (onchain?.author) {
+      payTo = onchain.author as `0x${string}`;
+      amount = kind === 'full' ? onchain.pricePerFull : onchain.pricePerQuery;
+      return { payTo, amount };
     }
-
-    return await next();
+    const meta = await getPaperMetadata(paperId);
+    if (meta?.author) {
+      payTo = meta.author as `0x${string}`;
+      amount = BigInt(Math.round((kind === 'full' ? meta.price_full : meta.price_query) * 1e6));
+    }
   } catch (err) {
-    console.error('[x402] Error in middleware processing, falling back to manual 402:', err);
-    
-    // x402 V2 Compliant Payment requirements
-    let dynamicPayTo = PAY_TO_ADDRESS;
-    try {
-      const paperId = c.req.param('id');
-      if (paperId) {
-        // High-speed cloud fallback using Supabase
-        const meta = await getPaperMetadata(paperId);
-        if (meta && meta.author) {
-          dynamicPayTo = meta.author;
-        } else {
-          // Blockchain fallback
-          const { getPaperFromChain } = await import('./services/contract.js');
-          const paper = await getPaperFromChain(paperId as `0x${string}`);
-          if (paper && paper.author) dynamicPayTo = paper.author;
-        }
-      }
-    } catch (e) {
-      console.warn('[x402] Could not fetch dynamic author, falling back to default recipient.');
-    }
+    console.warn('[payment] target resolution fell back to defaults:', err);
+  }
 
-    const manualAccepts = [
+  return { payTo, amount };
+}
+
+function build402(
+  resourceUrl: string,
+  payTo: `0x${string}`,
+  amount: bigint
+): Record<string, any> {
+  return {
+    x402Version: 2,
+    resource: { url: resourceUrl, description: 'SciGate protected resource' },
+    accepts: [
       {
         scheme: 'exact',
-        network: WORLD_CHAIN, 
-        asset: WORLD_USDC,    
-        amount: '10000',      
-        payTo: dynamicPayTo,
+        network: WORLD_CHAIN,
+        asset: WORLD_USDC,
+        amount: amount.toString(),
+        payTo,
         maxTimeoutSeconds: 3600,
-        extra: {}
+        extra: {},
       },
       {
         scheme: 'exact',
-        network: SOLANA, 
-        asset: SOLANA_USDC,    
-        amount: '10000',      
+        network: SOLANA,
+        asset: SOLANA_USDC,
+        amount: amount.toString(),
         payTo: PAY_TO_ADDRESS_SOLANA,
         maxTimeoutSeconds: 3600,
-        extra: {
-          facilitatorUrl: SOLANA_FACILITATOR_URL
-        }
-      }
-    ];
-
-    const paymentRequired = {
-      x402Version: 2,
-      resource: { 
-        url: c.req.url, 
-        description: 'SciGate Protected Resource' 
+        extra: { facilitatorUrl: SOLANA_FACILITATOR_URL },
       },
-      accepts: manualAccepts
-    };
+    ],
+  };
+}
 
-    return c.json(paymentRequired, 402, {
-      'PAYMENT-REQUIRED': JSON.stringify(paymentRequired)
-    });
+const paymentMiddleware: MiddlewareHandler = async (c, next) => {
+  // Only gate the explicitly-declared paid routes
+  const path = c.req.path;
+  const method = c.req.method;
+
+  const isPaid =
+    (method === 'POST' && /^\/papers\/[^/]+\/query$/.test(path)) ||
+    (method === 'GET' && /^\/papers\/[^/]+\/(section\/[^/]+|citations|full|data)$/.test(path)) ||
+    (method === 'POST' && (path === '/agent/query' || path === '/agent/full'));
+
+  if (!isPaid) return next();
+
+  const paperIdMatch = path.match(/^\/papers\/([^/]+)/);
+  const paperId = paperIdMatch?.[1];
+  const kind: TrialKind = path.endsWith('/full') || path.endsWith('/data') ? 'full' : 'query';
+
+  const userId =
+    c.req.header('x-user-id') ||
+    c.req.header('x-forwarded-for')?.split(',')[0].trim() ||
+    c.req.header('cf-connecting-ip') ||
+    'anonymous';
+
+  // ── 1. Demo bypass (gated by DEMO_MODE env) ──────────────────
+  const proof = c.req.header('x-payment-proof') ?? c.req.header('PAYMENT-SIGNATURE') ?? '';
+  if (DEMO_MODE && (proof === 'demo_bypass' || proof === 'bypass')) {
+    console.log(`[payment][demo] bypass accepted for ${path}`);
+    return next();
   }
+
+  // ── 2. Verified on-chain payment ─────────────────────────────
+  if (proof && proof.startsWith('0x') && proof.length === 66 && paperId) {
+    const { payTo, amount } = await resolvePaymentTarget(paperId, kind);
+    const result = await verifyUsdcPayment(proof as `0x${string}`, payTo, amount);
+    if (result.ok) {
+      console.log(`[payment] verified ${proof.slice(0, 10)}… → ${payTo.slice(0, 8)}…`);
+      // Fire-and-forget on-chain record
+      recordAccess(paperId as `0x${string}`, kind, amount).catch((err) =>
+        console.warn('[recordAccess] background error:', err)
+      );
+      return next();
+    }
+    console.warn(`[payment] verification rejected: ${result.reason}`);
+  }
+
+  // ── 3. Free-trial (persisted) ────────────────────────────────
+  const usedNow = await incrementTrial(userId, kind);
+  const limit = kind === 'full' ? FREE_TRIAL_FULL : FREE_TRIAL_QUERY;
+  if (usedNow <= limit) {
+    console.log(`[trial] ${userId.slice(0, 16)} ${kind} ${usedNow}/${limit}`);
+    return next();
+  }
+
+  // ── 4. 402 challenge ─────────────────────────────────────────
+  if (!paperId) {
+    // Agent routes — use global payee with fixed price
+    const agentAmount = path === '/agent/full' ? 50_000n : 10_000n;
+    const body = build402(c.req.url, PAY_TO_ADDRESS as `0x${string}`, agentAmount);
+    return c.json(body, 402, { 'PAYMENT-REQUIRED': JSON.stringify(body) });
+  }
+
+  const { payTo, amount } = await resolvePaymentTarget(paperId, kind);
+  const body = build402(c.req.url, payTo, amount);
+  return c.json(body, 402, { 'PAYMENT-REQUIRED': JSON.stringify(body) });
 };
 
-app.use('*', manualX402Middleware);
+app.use('*', paymentMiddleware);
 
-// ── Root / Status route ──────────────────────────────────────────────────────
-app.get('/', (c) => c.html(`
+// ────────────────────────────────────────────────────────────────────────────
+// 4. Routes
+// ────────────────────────────────────────────────────────────────────────────
+
+app.get('/', (c) =>
+  c.html(`
   <div style="font-family: sans-serif; padding: 40px; text-align: center;">
-    <h1 style="color: #6366f1;">🛰️ SciGate API is Online</h1>
-    <p>Version: 2.0.7 | Environment: World Chain Mainnet</p>
-    <div style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 8px; display: inline-block;">
-      Status: 🟢 Protected by x402 & World ID 4.0
-    </div>
+    <h1 style="color: #6366f1;">🛰️ SciGate API</h1>
+    <p>Version 2.1.0 · ${IS_PRODUCTION ? 'Production' : 'Development'}${
+      DEMO_MODE ? ' · <strong style="color:orange">DEMO MODE</strong>' : ''
+    }</p>
   </div>
-`));
+`)
+);
 
-// ── Free routes ─────────────────────────────────────────────────────────────
+// ── Free ─────────────────────────────────────────────────────
 app.get('/papers/:id/preview', async (c) => {
   const paperId = c.req.param('id');
-  const { handlePreview } = await import('./routes/papers.js');
-  const result = await handlePreview(paperId);
-  return c.json(result);
+  const { data, status } = await handlePreview(paperId);
+  return c.json(data, status as any);
 });
 
 app.route('/papers', papers);
 app.route('/authors', authors);
 
-// ── World ID 4.0 Native Signature ───────────────────────────────────────────
+// ── World ID RP signing ──────────────────────────────────────
 app.post('/api/world-id/rp-context', async (c) => {
   try {
-    const { app_id, action, signal } = await c.req.json();
-    
+    const { action, signal } = await c.req.json();
     if (!WORLD_ID_SIGNING_KEY || !WORLD_ID_RP_ID) {
-      console.warn('[WorldID] Missing RP configuration. Set signing key and RP ID.');
-      return c.json({ error: 'RP Configuration missing' }, 500);
+      return c.json({ error: 'RP configuration missing' }, 500);
     }
-
     const sigData = signRequest({
       signingKeyHex: WORLD_ID_SIGNING_KEY,
       action: action,
       signal: signal,
     } as any);
 
-    const rpContext = {
+    return c.json({
       rp_id: WORLD_ID_RP_ID,
       nonce: sigData.nonce,
       signature: sigData.sig,
       created_at: sigData.createdAt,
       expires_at: sigData.expiresAt,
-    };
-
-    console.log(`[WorldID] RP Context generated for action: ${action}`);
-    return c.json(rpContext);
+    });
   } catch (err: any) {
-    console.error('[WorldID] Failed to sign request:', err);
-    return c.json({ error: err.message || 'Signature failed' }, 500);
+    console.error('[WorldID] sign failed:', err);
+    return c.json({ error: err.message ?? 'signature failed' }, 500);
   }
 });
 
-// ── Paid routes ─────────────────────────────────────────────────────────────
+// ── Paid (reach here only after paymentMiddleware grants) ────
 app.post('/papers/:id/query', async (c) => {
   const paperId = c.req.param('id');
   let body: any;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
   const { data, status } = await handleQuery(paperId, body.question ?? '');
   return c.json(data, status as any);
 });
 
 app.get('/papers/:id/section/:name', async (c) => {
-  const paperId = c.req.param('id');
-  const sectionName = c.req.param('name');
-  const { data, status } = await handleSection(paperId, sectionName);
+  const { data, status } = await handleSection(c.req.param('id'), c.req.param('name'));
   return c.json(data, status as any);
 });
 
 app.get('/papers/:id/citations', async (c) => {
-  const paperId = c.req.param('id');
-  const { data, status } = await handleCitations(paperId);
+  const { data, status } = await handleCitations(c.req.param('id'));
   return c.json(data, status as any);
 });
 
 app.get('/papers/:id/full', async (c) => {
-  const paperId = c.req.param('id');
-  const { data, status } = await handleFull(paperId);
+  const { data, status } = await handleFull(c.req.param('id'));
   return c.json(data, status as any);
 });
 
 app.get('/papers/:id/data', async (c) => {
-  const paperId = c.req.param('id');
-  const { data, status } = await handleData(paperId);
+  const { data, status } = await handleData(c.req.param('id'));
   return c.json(data, status as any);
 });
 
-// ── Global Agent Proxy (Gated) ──────────────────────────────────────────────
-async function handleAgentRequest(c: any, mode: string) {
+// ── Agent proxy (SSE) ────────────────────────────────────────
+async function handleAgentRequest(c: any, mode: 'query' | 'full') {
   try {
     const { topic } = await c.req.json();
     const { RAG_SERVICE_URL } = await import('./config.js');
 
-    console.log(`[AgentGated][${mode}] Proxying research: "${topic}" -> ${RAG_SERVICE_URL}`);
-
-    // Connect to Raspberry Pi RAG
     const response = await fetch(`${RAG_SERVICE_URL}/ask-agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -412,57 +440,49 @@ async function handleAgentRequest(c: any, mode: string) {
     });
 
     if (!response.ok) {
-      console.error(`[AgentGated] RAG Service Error: ${response.status}`);
+      console.error(`[agent] RAG upstream returned ${response.status}`);
       return c.json({ error: 'RAG service unreachable' }, 500);
     }
 
-    // Proxy SSE stream
     c.header('Content-Type', 'text/event-stream');
     c.header('Cache-Control', 'no-cache');
     c.header('Connection', 'keep-alive');
 
-    return stream(c, async (stream) => {
+    return stream(c, async (streamWriter) => {
       const reader = response.body?.getReader();
       if (!reader) return;
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          await stream.write(value);
+          await streamWriter.write(value);
         }
       } finally {
         reader.releaseLock();
       }
     });
-
   } catch (err: any) {
-    console.error('[AgentGated] System Error:', err);
-    return c.json({ error: 'Internal server proxy error' }, 500);
+    console.error('[agent] system error:', err);
+    return c.json({ error: 'Internal proxy error' }, 500);
   }
 }
 
 app.post('/agent/full', (c) => handleAgentRequest(c, 'full'));
 app.post('/agent/query', (c) => handleAgentRequest(c, 'query'));
 
-
 // ────────────────────────────────────────────────────────────────────────────
-// 6. Start server (NON-BLOCKING)
+// 5. Start
 // ────────────────────────────────────────────────────────────────────────────
-console.log('\n--- 🚀 SCIGATE SERVER STARTUP (V2.0.5) ---');
-
 serve({ fetch: app.fetch, port: PORT, hostname: '0.0.0.0' }, (info) => {
-  console.log(`🚀 SciGate API running at http://${info.address}:${info.port}`);
-  console.log(`🔒 Health Check is online. Environment: PRODUCCIÓN`);
-  
-  // INITIALIZE x402 IN BACKGROUND (with safety delay)
-  // This ensures Render detects the port IMMEDIATELY while we setup heavy services.
+  console.log(`🚀 SciGate API listening on http://${info.address}:${info.port}`);
+
+  // x402 resource server initializes in background (it hits network)
   setTimeout(async () => {
     try {
-      console.log('⏳ Initializing x402 Resource Server...');
       await resourceServer.initialize();
-      console.log('✅ x402 Resource Server initialized successfully');
+      console.log('✅ x402 resource server ready');
     } catch (err) {
-      console.error('⚠️ Warning: x402 Resource Server initialization failed:', err);
+      console.warn('⚠️  x402 resource server init failed:', err);
     }
   }, 100);
 });

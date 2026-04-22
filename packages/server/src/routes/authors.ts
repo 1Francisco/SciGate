@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
-import { WORLD_APP_ID, WORLD_ACTION_ID } from '../config.js';
+import { WORLD_APP_ID, WORLD_ACTION_ID, DEMO_MODE } from '../config.js';
 import { getAuthorPapersFromChain, getPaperFromChain } from '../services/contract.js';
+import { savePaperMetadata, getPapersByAuthor } from '../services/supabase.js';
 
 const authors = new Hono();
 
-import { savePaperMetadata, getPapersByAuthor } from '../services/supabase.js';
-
-// Registers an author after verifying their World ID proof server-side.
+/**
+ * Registers an author by verifying their World ID proof against the official API.
+ * In production, a failed verification is a hard error — no silent bypass.
+ * When DEMO_MODE=true a simulated success is returned for easier demos.
+ */
 authors.post('/register', async (c) => {
   let body: any;
   try {
@@ -21,24 +24,40 @@ authors.post('/register', async (c) => {
     return c.json({ error: 'wallet_address and world_id_proof are required' }, 400);
   }
 
-  // --- CLOUD MIGRATION: Supabase Storage ---
+  // Save metadata early so the frontend sees the paper even if WorldID
+  // verification takes time. If verification fails later the row stays
+  // marked as unverified via RLS policies (future work).
   if (paper_hash) {
-    console.log(`[Supabase] Storing paper ${paper_hash} in cloud for ${wallet_address}`);
     try {
       await savePaperMetadata({
         id: paper_hash,
-        title: 'Uploaded Paper',
+        title: body.title ?? 'Uploaded Paper',
         author: wallet_address.toLowerCase(),
-        price_query: Number(price_query || 0.01),
-        price_full: Number(price_full || 0.10)
+        price_query: Number(price_query ?? 0.01),
+        price_full: Number(price_full ?? 0.1),
       });
     } catch (err) {
-      console.warn('[Supabase] Failed to save metadata, but proceeding with verification:', err);
+      console.warn('[authors] savePaperMetadata failed:', err);
     }
   }
 
-  // Verify World ID proof server-side
   const { merkle_root, nullifier_hash, proof, verification_level } = world_id_proof;
+
+  if (!WORLD_APP_ID) {
+    if (DEMO_MODE) {
+      return c.json({
+        success: true,
+        demo: true,
+        author: {
+          wallet_address,
+          nullifier_hash: `demo_${Date.now()}`,
+          verified: true,
+          verification_level: 'device',
+        },
+      });
+    }
+    return c.json({ error: 'WORLD_APP_ID not configured' }, 500);
+  }
 
   const verifyRes = await fetch(
     `https://developer.world.org/api/v4/verify/${WORLD_APP_ID}`,
@@ -58,28 +77,34 @@ authors.post('/register', async (c) => {
 
   if (!verifyRes.ok) {
     const errBody = await verifyRes.json().catch(() => ({}));
-    console.warn('\n--- [HACKATHON] BYPASSING BACKEND VERIFICATION ERROR ---');
-    console.warn('World ID API blocked the proof (probably due to Legacy App ID or Simulator Proof).');
-    console.warn('Detail:', JSON.stringify(errBody));
-    
-    // Bypass for the hackathon MVP: Proceed as if it succeeded.
-    return c.json({
-      success: true,
-      author: {
-        wallet_address,
-        nullifier_hash: 'mock_nullifier_' + Date.now().toString(),
-        verified: true,
-        verification_level: 'device',
-        registered_at: new Date().toISOString(),
-        note: 'Hackathon bypass used',
+    if (DEMO_MODE) {
+      console.warn('[authors][demo] World ID rejected but DEMO_MODE=true → returning simulated success');
+      return c.json({
+        success: true,
+        demo: true,
+        author: {
+          wallet_address,
+          nullifier_hash: `demo_${Date.now()}`,
+          verified: true,
+          verification_level: 'device',
+        },
+      });
+    }
+    return c.json(
+      {
+        error: 'World ID verification failed',
+        code: (errBody as any).code,
+        detail: errBody,
       },
-    });
+      400
+    );
   }
 
-  const verifyData = await verifyRes.json() as { success: boolean; nullifier_hash: string };
+  const verifyData = (await verifyRes.json()) as {
+    success: boolean;
+    nullifier_hash: string;
+  };
 
-  // In a real implementation you'd persist this to a DB.
-  // For MVP, we return the verified author info for the frontend to store locally.
   return c.json({
     success: true,
     author: {
@@ -92,8 +117,7 @@ authors.post('/register', async (c) => {
   });
 });
 
-// ── GET /authors/:address/papers ──────────────────────────────────────────────
-// Returns all papers registered by a specific author wallet.
+// ── GET /authors/:address/papers ──────────────────────────────
 authors.get('/:address/papers', async (c) => {
   const address = c.req.param('address') as `0x${string}`;
 
@@ -101,13 +125,11 @@ authors.get('/:address/papers', async (c) => {
     return c.json({ error: 'Invalid Ethereum address' }, 400);
   }
 
-  // 1. Fetch from Blockchain (On-Chain)
+  // On-chain papers
   let blockchainResults: any[] = [];
   try {
     const paperHashes = await getAuthorPapersFromChain(address);
-    const papers = await Promise.allSettled(
-      paperHashes.map((hash) => getPaperFromChain(hash))
-    );
+    const papers = await Promise.allSettled(paperHashes.map((h) => getPaperFromChain(h)));
     blockchainResults = papers
       .map((r, i) => ({
         contentHash: paperHashes[i],
@@ -115,16 +137,22 @@ authors.get('/:address/papers', async (c) => {
       }))
       .filter((p) => p.contentHash);
   } catch (err) {
-    console.warn('Failed to fetch from chain, defaulting to mock data only', err);
+    console.warn('[authors] chain read failed:', err);
   }
 
-  // 2. Fetch from Supabase Cloud (Off-Chain Metadata)
+  // Off-chain metadata
   const offchainResults = await getPapersByAuthor(address);
 
-  // 3. Merge results
-  const results = [...offchainResults, ...blockchainResults];
+  // Deduplicate by contentHash / id; on-chain wins (canonical)
+  const byId = new Map<string, any>();
+  for (const p of offchainResults) {
+    byId.set(p.id.toLowerCase(), { source: 'supabase', ...p });
+  }
+  for (const p of blockchainResults) {
+    byId.set((p.contentHash as string).toLowerCase(), { source: 'chain', ...p });
+  }
 
-  return c.json({ author: address, papers: results });
+  return c.json({ author: address, papers: Array.from(byId.values()) });
 });
 
 export { authors };

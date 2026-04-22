@@ -1,5 +1,7 @@
 import { RAG_SERVICE_URL } from '../config.js';
 
+const RAG_INTERNAL_TOKEN = process.env.RAG_INTERNAL_TOKEN ?? '';
+
 export interface UploadResponse {
   paper_id: string;
   content_hash: string;
@@ -10,11 +12,7 @@ export interface UploadResponse {
 
 export interface QueryResponse {
   answer: string;
-  chunks: Array<{
-    text: string;
-    page: number;
-    chunk_index: number;
-  }>;
+  chunks: Array<{ text: string; page: number; chunk_index: number }>;
   paper_id: string;
 }
 
@@ -29,46 +27,52 @@ export interface SectionsResponse {
   sections: SectionInfo[];
 }
 
-async function ragFetch<T>(path: string, options?: RequestInit, retries = 3): Promise<{ data: T, status: number }> {
+function internalHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const h: Record<string, string> = { ...extra };
+  if (RAG_INTERNAL_TOKEN) h['x-internal-token'] = RAG_INTERNAL_TOKEN;
+  return h;
+}
+
+async function ragFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  retries = 2
+): Promise<{ data: T; status: number }> {
   const url = `${RAG_SERVICE_URL}${path}`;
-  for (let i = 0; i < retries; i++) {
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, options);
-      
-      // If payment required, return data and status immediately
-      if (res.status === 402) {
-        const data = await res.json() as T;
-        return { data, status: 402 };
+      const res = await fetch(url, {
+        ...init,
+        headers: internalHeaders((init.headers as Record<string, string>) ?? {}),
+      });
+
+      if (res.ok || res.status === 402 || res.status === 404) {
+        const data = (await res.json()) as T;
+        return { data, status: res.status };
       }
 
-      if (res.ok) {
-        const data = await res.json() as T;
-        return { data, status: 200 };
-      }
-      
-      // If busy (Gemini 503) or rate limited (429), retry with delay
       if (res.status === 503 || res.status === 429) {
-        console.warn(`[RAG] Engine busy (${res.status}), retrying in ${1000 * (i + 1)}ms...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        const wait = 500 * (attempt + 1);
+        console.warn(`[rag] upstream ${res.status}, retrying in ${wait}ms`);
+        await new Promise((r) => setTimeout(r, wait));
         continue;
       }
 
-      const body = await res.text().catch(() => 'unknown error');
-      throw new Error(`RAG engine error (${res.status}): ${body}`);
+      const text = await res.text().catch(() => '');
+      throw new Error(`RAG engine error (${res.status}): ${text}`);
     } catch (err: any) {
-      if (i === retries - 1) throw err;
-      console.warn(`[RAG] Fetch attempt ${i + 1} failed, retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (attempt === retries) throw err;
+      console.warn(`[rag] fetch attempt ${attempt + 1} failed, retrying:`, err.message);
+      await new Promise((r) => setTimeout(r, 500));
     }
   }
   throw new Error('RAG engine unreachable after retries');
 }
 
 export async function uploadPaper(formData: FormData) {
-  return ragFetch<UploadResponse>('/upload', {
-    method: 'POST',
-    body: formData,
-  });
+  // Upload does not require the internal token so the frontend can call it directly.
+  return ragFetch<UploadResponse>('/upload', { method: 'POST', body: formData });
 }
 
 export async function queryPaper(paperId: string, question: string) {
