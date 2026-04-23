@@ -6,6 +6,8 @@ import { parseUnits, encodeFunctionData } from 'viem';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
+const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
+const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? '';
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -47,15 +49,24 @@ export default function UploadPage() {
   };
 
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const addLog = (msg: string) => {
+  const addLog = async (msg: string) => {
     console.log(`[DEBUG] ${msg}`);
     setDebugLogs(prev => [msg, ...prev].slice(0, 5));
+    
+    // Enviar a Render (Consola)
+    try {
+      await fetch(`${API_URL}/api/debug/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg, device: walletAddress || 'initial' })
+      });
+    } catch(e) {}
   };
 
   // 2. DETECTAR WALLET + VERIFICAR WORLD ID (TODO EN UNO)
   const handleDetectAndVerify = async () => {
     setError('');
-    addLog('Iniciando handleDetectAndVerify...');
+    addLog('--- INICIANDO FLUJO ---');
     
     if (!MiniKit.isInstalled()) {
       setError('Por favor, abre esta app dentro de World App.');
@@ -73,56 +84,40 @@ export default function UploadPage() {
 
       if (authRes.data?.address) {
         const address = authRes.data.address;
-        addLog(`Wallet OK: ${address.slice(0,6)}...`);
+        addLog(`Wallet Detectada: ${address}`);
         setWalletAddress(address);
         setWalletConfirmed(true);
         setIsVerifying(true);
 
+        addLog('Iniciando búsqueda de verify() en 2s...');
         setTimeout(async () => {
           try {
             const mini = (MiniKit as any);
-            addLog('Escaneando prototipos de MiniKit...');
-            
             let verifyFn = null;
-            let currentObj = mini;
-            
-            // Recorremos la cadena de prototipos para encontrar la función
-            // SIN TOCAR jamas las propiedades prohibidas
-            while (currentObj && !verifyFn) {
-              const props = Object.getOwnPropertyNames(currentObj);
-              if (props.includes('verify')) {
-                verifyFn = mini['verify'];
-                addLog('¡HALLADO! MiniKit.verify en prototipo');
-                break;
+
+            // 1. Probar en el objeto activo
+            if (typeof mini['getActiveMiniKit'] === 'function') {
+              const active = mini['getActiveMiniKit']();
+              addLog(`Inspeccionando ActiveMiniKit...`);
+              if (active && typeof active['verify'] === 'function') {
+                verifyFn = active['verify'].bind(active);
+                addLog('¡HALLADO! verify() en ActiveMiniKit');
               }
-              if (props.includes('verifyPayload')) {
-                verifyFn = mini['verifyPayload'];
-                addLog('¡HALLADO! MiniKit.verifyPayload en prototipo');
-                break;
-              }
-              currentObj = Object.getPrototypeOf(currentObj);
+            }
+
+            // 2. Fallbacks si no se halló en Active
+            if (!verifyFn) {
+              verifyFn = mini['verify'] || (mini['commands'] && mini['commands']['verify']);
             }
 
             if (typeof verifyFn !== 'function') {
-              // Si no lo hallamos, probamos el acceso directo como último recurso
-              addLog('No hallado en prototipo. Probando acceso directo...');
-              verifyFn = mini.verify || mini.verifyPayload;
+              addLog('ERROR: Sigue sin aparecer verify(). Enviando lista completa a Render...');
+              const allKeys = Object.getOwnPropertyNames(mini);
+              addLog(`Lista completa: ${allKeys.join(', ')}`);
+              throw new Error('Función de verificación no encontrada.');
             }
 
-            if (typeof verifyFn !== 'function') {
-              addLog('ERROR CRÍTICO: verify() no existe en ningún nivel');
-              // Listar todo lo que hay para diagnóstico final
-              const allKeys = [];
-              let c = mini;
-              for(let i=0; i<2 && c; i++) {
-                allKeys.push(...Object.getOwnPropertyNames(c));
-                c = Object.getPrototypeOf(c);
-              }
-              addLog(`Disponibles: ${allKeys.filter(k => !k.startsWith('_')).slice(0, 10).join(', ')}`);
-              throw new Error('MiniKit.verify no disponible en esta versión.');
-            }
-
-            addLog('Lanzando verificación nativa...');
+            addLog('Lanzando World ID...');
             const verifyRes = await verifyFn({
               action: WORLD_ACTION_ID,
               signal: address.toLowerCase(),
@@ -133,7 +128,7 @@ export default function UploadPage() {
               addLog('Verificación EXITOSA');
               await handleVerifySuccess(verifyRes.finalPayload, address);
             } else {
-              addLog(`Cancelado: ${verifyRes.finalPayload.status}`);
+              addLog(`Cancelado por usuario: ${verifyRes.finalPayload.status}`);
               setError('Verificación cancelada.');
               setWalletConfirmed(false);
               setIsVerifying(false);
