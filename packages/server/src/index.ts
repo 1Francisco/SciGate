@@ -376,8 +376,16 @@ app.post('/api/world-id/rp-context', async (c) => {
     const targetAppId = app_id || WORLD_APP_ID;
 
     if (!WORLD_ID_SIGNING_KEY || !WORLD_ID_RP_ID || !targetAppId) {
+      console.error('❌ RP Configuration Incomplete:', { 
+        hasKey: !!WORLD_ID_SIGNING_KEY, 
+        rpId: WORLD_ID_RP_ID, 
+        appId: targetAppId 
+      });
       return c.json({ error: 'RP configuration incomplete' }, 500);
     }
+
+    console.log('🔐 Signing World ID Request:', { targetAppId, action, signal, rp_id: WORLD_ID_RP_ID });
+
     const sigData = signRequest({
       signingKeyHex: WORLD_ID_SIGNING_KEY,
       app_id: targetAppId,
