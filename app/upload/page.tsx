@@ -102,15 +102,13 @@ export default function UploadPage() {
             }
 
             if (activeInstance) {
-              addLog('Instancia hallada. Buscando verify...');
-              // Listar funciones de la instancia para Render
-              const instanceFuncs = Object.getOwnPropertyNames(Object.getPrototypeOf(activeInstance))
-                .filter(f => typeof (activeInstance as any)[f] === 'function');
-              addLog(`Funciones en Instancia: ${instanceFuncs.join(', ')}`);
-
+              addLog('Instancia hallada. Probando verify...');
+              
               if (typeof (activeInstance as any)['verify'] === 'function') {
                 verifyFn = (activeInstance as any)['verify'].bind(activeInstance);
-                addLog('¡ÉXITO! Hallado verify() en la instancia.');
+                addLog('¡HALLADO! verify() disponible en instancia.');
+              } else {
+                addLog('verify() no es función en instancia.');
               }
             }
 
