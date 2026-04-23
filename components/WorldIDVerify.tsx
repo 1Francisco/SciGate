@@ -24,7 +24,7 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
         throw new Error('MiniKit no está instalado');
       }
 
-      const response = await (MiniKit.commands as any).verify({
+      const response = await (MiniKit as any).verify({
         action: action,
         signal: signal,
         verification_level: "device",
