@@ -18,11 +18,11 @@ export const IS_PRODUCTION = NODE_ENV === 'production';
 export const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 if (DEMO_MODE && IS_PRODUCTION) {
-  console.warn(
-    '⚠️  DEMO_MODE=true while NODE_ENV=production — refusing dangerous configuration.'
-  );
-  console.warn('    Set DEMO_MODE=false or NODE_ENV!=production before starting.');
-  process.exit(1);
+  console.warn('\n────────────────────────────────────────────────────────────────────────');
+  console.warn('  ⚠️  WARNING: DEMO_MODE=true is active in a PRODUCTION environment.');
+  console.warn('  This configuration allows bypassing payments and identity checks.');
+  console.warn('  ONLY USE THIS FOR HACKATHON DEMONSTRATIONS.');
+  console.warn('────────────────────────────────────────────────────────────────────────\n');
 }
 
 export const PORT = parseInt(process.env.PORT ?? '3001', 10);
