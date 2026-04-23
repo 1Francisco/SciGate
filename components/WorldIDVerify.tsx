@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { IDKitRequestWidget, orbLegacy, IDKitResult, IDKitErrorCodes } from '@worldcoin/idkit';
+import { IDKitRequestWidget, deviceLegacy, IDKitResult, IDKitErrorCodes } from '@worldcoin/idkit';
 
 interface WorldIDVerifyProps {
   appId: string;
@@ -82,7 +82,7 @@ export default function WorldIDVerify({ appId, action, signal, onSuccess, onErro
       <IDKitRequestWidget
         app_id={appId as `app_${string}`}
         action={action}
-        preset={orbLegacy({ signal })}
+        preset={deviceLegacy({ signal })}
         rp_context={rpContext}
         open={isOpen}
         onOpenChange={setIsOpen}
