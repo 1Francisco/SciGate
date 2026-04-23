@@ -102,23 +102,24 @@ export default function UploadPage() {
         setWalletAddress(detectedAddress);
         setWalletConfirmed(true);
 
-        // 2. ¡FLUJO DIRECTO! Lanzar verificación de World ID inmediatamente
-        console.log('Wallet detected, triggering World ID verification automatically...');
-        try {
-          const verifyRes = await (MiniKit as any).verify({
-            action: WORLD_ACTION_ID,
-            signal: detectedAddress.toLowerCase(),
-            verification_level: 'device',
-          });
+        // Esperar 1 segundo para que el modal de wallet se cierre bien antes de lanzar el de World ID
+        console.log('Wallet detected, waiting 1s before World ID verification...');
+        setTimeout(async () => {
+          try {
+            const verifyRes = await (MiniKit as any).commands.verify({
+              action: WORLD_ACTION_ID,
+              signal: detectedAddress.toLowerCase(),
+              verification_level: 'device',
+            });
 
-          if (verifyRes.finalPayload.status === 'success') {
-            console.log('Automatic Verification Success:', verifyRes.finalPayload);
-            // Reutilizamos la función que ya maneja el éxito
-            handleVerifyWorldId(verifyRes.finalPayload);
+            if (verifyRes.finalPayload.status === 'success') {
+              handleVerifyWorldId(verifyRes.finalPayload);
+            }
+          } catch (vErr) {
+            console.error('Automatic verification failed:', vErr);
+            setStep('verify');
           }
-        } catch (vErr) {
-          console.error('Automatic verification failed, user can still click the button manually:', vErr);
-        }
+        }, 1000);
       } else {
         throw new Error('Wallet detection failed or was cancelled.');
       }
