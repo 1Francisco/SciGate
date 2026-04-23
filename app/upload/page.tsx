@@ -78,38 +78,51 @@ export default function UploadPage() {
         setWalletConfirmed(true);
         setIsVerifying(true);
 
-        addLog('Esperando 2s para World ID...');
         setTimeout(async () => {
           try {
             const mini = (MiniKit as any);
+            addLog('Escaneando prototipos de MiniKit...');
             
-            // BUSCADOR AGRESIVO
             let verifyFn = null;
+            let currentObj = mini;
             
-            if (typeof mini['verify'] === 'function') {
-              verifyFn = mini['verify'];
-              addLog('Detectado: MiniKit.verify');
-            } else if (typeof mini['verifyPayload'] === 'function') {
-              verifyFn = mini['verifyPayload'];
-              addLog('Detectado: MiniKit.verifyPayload');
-            } else if (mini['commandsAsync'] && typeof mini['commandsAsync']['verify'] === 'function') {
-              verifyFn = mini['commandsAsync']['verify'];
-              addLog('Detectado: commandsAsync.verify');
-            } else if (mini['commands'] && typeof mini['commands']['verify'] === 'function') {
-              // Si llegamos aquí es que el error de "removed" era un aviso o se puede saltar
-              verifyFn = mini['commands']['verify'];
-              addLog('Detectado: commands.verify (fallback)');
+            // Recorremos la cadena de prototipos para encontrar la función
+            // SIN TOCAR jamas las propiedades prohibidas
+            while (currentObj && !verifyFn) {
+              const props = Object.getOwnPropertyNames(currentObj);
+              if (props.includes('verify')) {
+                verifyFn = mini['verify'];
+                addLog('¡HALLADO! MiniKit.verify en prototipo');
+                break;
+              }
+              if (props.includes('verifyPayload')) {
+                verifyFn = mini['verifyPayload'];
+                addLog('¡HALLADO! MiniKit.verifyPayload en prototipo');
+                break;
+              }
+              currentObj = Object.getPrototypeOf(currentObj);
             }
 
-            if (!verifyFn) {
-              addLog('ERROR: No se halló nada. Probando nombres alternativos...');
-              // Listar TODO lo que sea función
-              const allFuncs = Object.getOwnPropertyNames(mini).filter(p => typeof mini[p] === 'function');
-              addLog(`Funcs: ${allFuncs.join(', ')}`);
-              throw new Error('No se detectó función de verificación.');
+            if (typeof verifyFn !== 'function') {
+              // Si no lo hallamos, probamos el acceso directo como último recurso
+              addLog('No hallado en prototipo. Probando acceso directo...');
+              verifyFn = mini.verify || mini.verifyPayload;
             }
 
-            addLog('Lanzando verificación...');
+            if (typeof verifyFn !== 'function') {
+              addLog('ERROR CRÍTICO: verify() no existe en ningún nivel');
+              // Listar todo lo que hay para diagnóstico final
+              const allKeys = [];
+              let c = mini;
+              for(let i=0; i<2 && c; i++) {
+                allKeys.push(...Object.getOwnPropertyNames(c));
+                c = Object.getPrototypeOf(c);
+              }
+              addLog(`Disponibles: ${allKeys.filter(k => !k.startsWith('_')).slice(0, 10).join(', ')}`);
+              throw new Error('MiniKit.verify no disponible en esta versión.');
+            }
+
+            addLog('Lanzando verificación nativa...');
             const verifyRes = await verifyFn({
               action: WORLD_ACTION_ID,
               signal: address.toLowerCase(),
