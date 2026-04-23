@@ -104,7 +104,7 @@ export default function UploadPage() {
         ? rpSig.rp_id 
         : RP_ID;
         
-      const request = await IDKit.request({
+      const idkitPayload = {
         app_id: WORLD_APP_ID,
         action: WORLD_ACTION_ID,
         rp_context: {
@@ -116,7 +116,11 @@ export default function UploadPage() {
         },
         allow_legacy_proofs: true,
         environment: 'production',
-      }).preset(deviceLegacy({ signal: address.toLowerCase() }));
+      };
+      
+      addLog(`Payload IDKit: ${JSON.stringify(idkitPayload, null, 2)}`);
+      
+      const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
 
       addLog('Esperando verificación del usuario...');
       const completion = await request.pollUntilCompletion({ timeout: 120000 });
