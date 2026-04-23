@@ -374,37 +374,22 @@ app.post('/api/world-id/rp-context', async (c) => {
   try {
     const { action, signal, app_id } = await c.req.json();
     const targetAppId = app_id || WORLD_APP_ID;
-    
-    // El dominio para la firma (WebAuthn style)
-    const signingDomain = process.env.WORLD_ID_DOMAIN || WORLD_ID_RP_ID;
 
     if (!WORLD_ID_SIGNING_KEY || !WORLD_ID_RP_ID || !targetAppId) {
-      console.error('❌ RP Configuration Incomplete:', { 
-        hasKey: !!WORLD_ID_SIGNING_KEY, 
-        rpId: WORLD_ID_RP_ID, 
-        appId: targetAppId 
-      });
       return c.json({ error: 'RP configuration incomplete' }, 500);
     }
 
-    console.log('🔐 Signing World ID Request:', { 
-      targetAppId, 
-      action, 
-      signal, 
-      rp_id: WORLD_ID_RP_ID,
-      signingDomain 
-    });
+    console.log('🔐 Signing World ID Request:', { targetAppId, action, signal, rp_id: WORLD_ID_RP_ID });
 
     const sigData = signRequest({
       signingKeyHex: WORLD_ID_SIGNING_KEY,
       app_id: targetAppId,
       action: action,
       signal: signal,
-      verification_level: 'device', // Coincidir con deviceLegacy del frontend
     } as any);
 
     return c.json({
-      rp_id: WORLD_ID_RP_ID, // El ID rp_... que identifica tu app
+      rp_id: WORLD_ID_RP_ID,
       nonce: sigData.nonce,
       signature: sigData.sig,
       created_at: sigData.createdAt,
