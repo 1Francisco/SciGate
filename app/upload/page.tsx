@@ -73,9 +73,18 @@ export default function UploadPage() {
         console.log('Wallet detected, launching World ID...');
         setTimeout(async () => {
           try {
-            // Probamos verify directamente. 
-            // Si esto falla, es que el comando de verificación ha cambiado de nombre o no está disponible.
-            const verifyRes = await (MiniKit as any).verify({
+            const mini = (MiniKit as any);
+            // BUSCADOR TODOTERRENO: Intentamos todas las rutas posibles
+            const verifyFn = mini.verify || 
+                             (mini.commands && mini.commands.verify) || 
+                             (mini.commandsAsync && mini.commandsAsync.verify);
+            
+            if (typeof verifyFn !== 'function') {
+              throw new Error('No se encontró la función verify en ninguna ruta de MiniKit (direct, commands, o commandsAsync)');
+            }
+
+            console.log('Usando función de verificación encontrada...');
+            const verifyRes = await verifyFn({
               action: WORLD_ACTION_ID,
               signal: address.toLowerCase(),
               verification_level: 'device',
@@ -90,7 +99,7 @@ export default function UploadPage() {
             }
           } catch (vErr: any) {
             console.error('Verify Error:', vErr);
-            setError('Error de World ID: ' + (vErr.message || 'Fallo en verify()'));
+            setError('Error de World ID: ' + (vErr.message || 'Fallo en la llamada nativa'));
             setWalletConfirmed(false);
             setIsVerifying(false);
           }
