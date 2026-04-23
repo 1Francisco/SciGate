@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { parseUnits, encodeFunctionData } from 'viem';
 import { MiniKit } from '@worldcoin/minikit-js';
+import { IDKit, deviceLegacy } from '@worldcoin/idkit-core';
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? '';
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? 'app_aacdf4487837b144901774135e3b0803') as `app_${string}`;
+const RP_ID = process.env.NEXT_PUBLIC_RP_ID ?? 'rp_e2b239675f4bd84b';
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -30,28 +32,10 @@ export default function UploadPage() {
   const [priceQuery, setPriceQuery] = useState('0.01');
   const [priceFull, setPriceFull] = useState('0.10');
 
-  // 1. Manejo del éxito de la verificación
-  const handleVerifySuccess = async (proof: any, address: string) => {
-    const res = await fetch('/api/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proof, wallet_address: address }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setWorldIdProof(proof);
-      setStep('upload');
-    } else {
-      setError('World ID verification failed on server: ' + (data.error ?? 'unknown'));
-      setWalletConfirmed(false);
-      setIsVerifying(false);
-    }
-  };
-
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const addLog = async (msg: string) => {
     console.log(`[DEBUG] ${msg}`);
-    setDebugLogs(prev => [msg, ...prev].slice(0, 5));
+    setDebugLogs(prev => [msg, ...prev].slice(0, 8));
     
     // Enviar a Render (Consola)
     try {
@@ -63,7 +47,7 @@ export default function UploadPage() {
     } catch(e) {}
   };
 
-  // 2. DETECTAR WALLET + VERIFICAR WORLD ID (TODO EN UNO)
+  // ── FLUJO PRINCIPAL: Wallet Auth + World ID via IDKit ──────────
   const handleDetectAndVerify = async () => {
     setError('');
     addLog('--- INICIANDO FLUJO ---');
@@ -75,87 +59,92 @@ export default function UploadPage() {
     }
 
     try {
-      addLog('Solicitando walletAuth...');
+      // ── PASO 1: Obtener wallet vía walletAuth ──
+      addLog('Paso 1: Solicitando walletAuth...');
       const authRes = await (MiniKit as any).walletAuth({
         nonce: Math.random().toString(36).substring(2),
         requestId: 'scigate_auth',
         expirationTime: new Date(Date.now() + 1000 * 60 * 60),
       });
 
-      if (authRes.data?.address) {
-        const address = authRes.data.address;
-        addLog(`Wallet Detectada: ${address}`);
-        setWalletAddress(address);
-        setWalletConfirmed(true);
-        setIsVerifying(true);
-
-        addLog('Iniciando búsqueda de verify() en 2s...');
-        setTimeout(async () => {
-          try {
-            const mini = (MiniKit as any);
-            let verifyFn = null;
-
-            addLog('Probando rutas de emergencia...');
-
-            // 1. ¿Se llama attestation? (Estaba en tu lista)
-            if (typeof mini['attestation'] === 'function') {
-              addLog('Probando con attestation()...');
-              verifyFn = mini['attestation'].bind(mini);
-            } 
-            
-            // 2. ¿Se llama idKit?
-            if (!verifyFn && typeof mini['idKit'] === 'function') {
-              addLog('Probando con idKit()...');
-              verifyFn = mini['idKit'].bind(mini);
-            }
-
-            // 3. Forzar el objeto prohibido (commands) pero con protección total
-            if (!verifyFn) {
-              addLog('Intento desesperado: Forzando commands.verify...');
-              try {
-                // Intentamos acceder SIN preguntar si existe para no disparar el Proxy
-                const forcedFn = mini['commands']['verify'];
-                if (typeof forcedFn === 'function') {
-                  verifyFn = forcedFn.bind(mini['commands']);
-                  addLog('¡FORZADO! commands.verify obtenido.');
-                }
-              } catch(e) {
-                addLog('Fallo al forzar commands.');
-              }
-            }
-
-            if (typeof verifyFn !== 'function') {
-              addLog('ERROR: Agotadas todas las rutas.');
-              throw new Error('No se detectó función de verificación. Prueba manual requerida.');
-            }
-
-            addLog('Ejecutando verificación...');
-            const verifyRes = await verifyFn({
-              action: WORLD_ACTION_ID,
-              signal: address.toLowerCase(),
-              verification_level: 'device',
-            });
-
-            if (verifyRes.finalPayload.status === 'success') {
-              addLog('Verificación EXITOSA');
-              await handleVerifySuccess(verifyRes.finalPayload, address);
-            } else {
-              addLog(`Cancelado por usuario: ${verifyRes.finalPayload.status}`);
-              setError('Verificación cancelada.');
-              setWalletConfirmed(false);
-              setIsVerifying(false);
-            }
-          } catch (vErr: any) {
-            addLog(`Error V: ${vErr.message}`);
-            setError('Error de World ID: ' + (vErr.message || 'Fallo nativo'));
-            setWalletConfirmed(false);
-            setIsVerifying(false);
-          }
-        }, 2000);
+      if (!authRes.data?.address) {
+        throw new Error('No se obtuvo dirección de wallet');
       }
+
+      const address = authRes.data.address;
+      addLog(`Wallet OK: ${address.slice(0, 10)}...`);
+      setWalletAddress(address);
+      setWalletConfirmed(true);
+      setIsVerifying(true);
+
+      // ── PASO 2: Obtener firma RP del backend ──
+      addLog('Paso 2: Obteniendo firma RP...');
+      const rpSigRes = await fetch('/api/rp-signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: WORLD_ACTION_ID }),
+      });
+
+      if (!rpSigRes.ok) {
+        const rpErr = await rpSigRes.json().catch(() => ({}));
+        throw new Error(`Firma RP falló: ${rpErr.error || rpSigRes.status}`);
+      }
+
+      const rpSig = await rpSigRes.json();
+      addLog('Firma RP obtenida ✓');
+
+      // ── PASO 3: Lanzar verificación World ID vía IDKit ──
+      addLog('Paso 3: Lanzando World ID (IDKit)...');
+      const request = await IDKit.request({
+        app_id: WORLD_APP_ID,
+        action: WORLD_ACTION_ID,
+        rp_context: {
+          rp_id: RP_ID,
+          nonce: rpSig.nonce,
+          created_at: rpSig.created_at,
+          expires_at: rpSig.expires_at,
+          signature: rpSig.sig,
+        },
+        allow_legacy_proofs: true,
+        environment: 'production',
+      }).preset(deviceLegacy({ signal: address.toLowerCase() }));
+
+      addLog('Esperando verificación del usuario...');
+      const completion = await request.pollUntilCompletion({ timeout: 120000 });
+
+      if (!completion.success) {
+        addLog(`World ID falló: ${completion.error}`);
+        throw new Error(`Verificación World ID fallida: ${completion.error}`);
+      }
+
+      addLog('World ID verificado ✓');
+      const idkitResult = completion.result;
+
+      // ── PASO 4: Verificar proof en backend ──
+      addLog('Paso 4: Verificando proof en backend...');
+      const verifyRes = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proof: idkitResult,
+          wallet_address: address,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (verifyData.success) {
+        addLog('¡VERIFICACIÓN COMPLETA! ✓✓✓');
+        setWorldIdProof(idkitResult);
+        setStep('upload');
+      } else {
+        throw new Error('Verificación backend falló: ' + (verifyData.error ?? 'unknown'));
+      }
+
     } catch (err: any) {
-      addLog(`Error A: ${err.message}`);
-      setError('Fallo al conectar wallet: ' + (err.message || 'Cerraste la app?'));
+      addLog(`Error: ${err.message}`);
+      setError(err.message || 'Error inesperado');
+      setWalletConfirmed(false);
+      setIsVerifying(false);
     }
   };
 
