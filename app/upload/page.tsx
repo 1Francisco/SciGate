@@ -83,31 +83,33 @@ export default function UploadPage() {
           try {
             const mini = (MiniKit as any);
             
-            // INTROSPECCIÓN: Ver qué hay realmente en MiniKit
-            const keys = Object.keys(mini).filter(k => typeof mini[k] === 'function' || typeof mini[k] === 'object');
-            addLog(`Keys en MiniKit: ${keys.join(', ')}`);
-
-            let verifyFn = mini['verify'];
-            if (verifyFn) addLog('Encontrado: MiniKit.verify');
+            // BUSCADOR AGRESIVO
+            let verifyFn = null;
             
-            if (!verifyFn && mini['commands']) {
-              addLog('Buscando en commands...');
-              verifyFn = mini['commands']['verify'];
-              if (verifyFn) addLog('Encontrado: commands.verify');
-            }
-
-            if (!verifyFn && mini['commandsAsync']) {
-              addLog('Buscando en commandsAsync...');
+            if (typeof mini['verify'] === 'function') {
+              verifyFn = mini['verify'];
+              addLog('Detectado: MiniKit.verify');
+            } else if (typeof mini['verifyPayload'] === 'function') {
+              verifyFn = mini['verifyPayload'];
+              addLog('Detectado: MiniKit.verifyPayload');
+            } else if (mini['commandsAsync'] && typeof mini['commandsAsync']['verify'] === 'function') {
               verifyFn = mini['commandsAsync']['verify'];
-              if (verifyFn) addLog('Encontrado: commandsAsync.verify');
-            }
-            
-            if (typeof verifyFn !== 'function') {
-              addLog('ERROR: No se halló función verify');
-              throw new Error('Función verify no encontrada. Revisa los logs en pantalla.');
+              addLog('Detectado: commandsAsync.verify');
+            } else if (mini['commands'] && typeof mini['commands']['verify'] === 'function') {
+              // Si llegamos aquí es que el error de "removed" era un aviso o se puede saltar
+              verifyFn = mini['commands']['verify'];
+              addLog('Detectado: commands.verify (fallback)');
             }
 
-            addLog('Lanzando modal de World ID...');
+            if (!verifyFn) {
+              addLog('ERROR: No se halló nada. Probando nombres alternativos...');
+              // Listar TODO lo que sea función
+              const allFuncs = Object.getOwnPropertyNames(mini).filter(p => typeof mini[p] === 'function');
+              addLog(`Funcs: ${allFuncs.join(', ')}`);
+              throw new Error('No se detectó función de verificación.');
+            }
+
+            addLog('Lanzando verificación...');
             const verifyRes = await verifyFn({
               action: WORLD_ACTION_ID,
               signal: address.toLowerCase(),
