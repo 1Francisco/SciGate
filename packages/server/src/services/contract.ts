@@ -8,12 +8,11 @@ import {
 import { enqueuePendingRecord } from './supabase.js';
 
 const PAPER_REGISTRY_ABI = parseAbi([
-  'function getPaper(bytes32 contentHash) view returns (bytes32 contentHash, address author, uint256 pricePerQuery, uint256 pricePerFull, uint256 trainingPrice, string metadataURI, uint256 totalEarnings, uint256 totalAccesses, bool active, uint256 createdAt)',
+  'function papers(bytes32 hash) view returns (address author, uint64 priceQuery, uint64 priceFull, uint64 priceTraining, bool active, uint40 createdAt, string metadataURI, uint256 totalEarnings, uint256 totalAccesses)',
   'function getAuthorPapers(address author) view returns (bytes32[])',
-  'function isPaperActive(bytes32 contentHash) view returns (bool)',
-  'function getPaperStats(bytes32 contentHash) view returns (uint256 totalEarnings, uint256 totalAccesses)',
-  'function exists(bytes32) view returns (bool)',
-  'function recordAccess(bytes32 contentHash, string accessType, uint256 amount)',
+  'function isPaperActive(bytes32 hash) view returns (bool)',
+  'function getPaperStats(bytes32 hash) view returns (uint256 totalEarnings, uint256 totalAccesses)',
+  'function recordAccess(bytes32 hash, uint256 amount)',
 ]);
 
 const worldChain = {
@@ -46,16 +45,15 @@ const walletClient = recorderAccount
   : null;
 
 export interface PaperOnChain {
-  contentHash: string;
   author: string;
-  pricePerQuery: bigint;
-  pricePerFull: bigint;
-  trainingPrice: bigint;
+  priceQuery: bigint;
+  priceFull: bigint;
+  priceTraining: bigint;
+  active: boolean;
+  createdAt: number;
   metadataURI: string;
   totalEarnings: bigint;
   totalAccesses: bigint;
-  active: boolean;
-  createdAt: bigint;
 }
 
 function hasRegistry(): boolean {
@@ -65,13 +63,26 @@ function hasRegistry(): boolean {
 export async function getPaperFromChain(contentHash: `0x${string}`): Promise<PaperOnChain | null> {
   if (!hasRegistry()) return null;
   try {
-    const paper = await publicClient.readContract({
+    const [author, pQuery, pFull, pTraining, active, createdAt, metadataURI, earnings, accesses] = await publicClient.readContract({
       address: PAPER_REGISTRY_ADDRESS as `0x${string}`,
       abi: PAPER_REGISTRY_ABI,
-      functionName: 'getPaper',
+      functionName: 'papers',
       args: [contentHash],
     });
-    return paper as any;
+    
+    if (author === '0x0000000000000000000000000000000000000000') return null;
+
+    return {
+      author,
+      priceQuery: pQuery,
+      priceFull: pFull,
+      priceTraining: pTraining,
+      active,
+      createdAt,
+      metadataURI,
+      totalEarnings: earnings,
+      totalAccesses: accesses
+    };
   } catch {
     return null;
   }
@@ -151,7 +162,7 @@ export async function recordAccess(
       address: PAPER_REGISTRY_ADDRESS as `0x${string}`,
       abi: PAPER_REGISTRY_ABI,
       functionName: 'recordAccess',
-      args: [contentHash, accessType, amount],
+      args: [contentHash, amount],
       chain: worldChain as any,
       account: recorderAccount,
     });

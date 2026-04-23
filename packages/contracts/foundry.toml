@@ -3,6 +3,8 @@ src = "src"
 out = "out"
 libs = ["lib"]
 solc = "0.8.24"
+optimizer = true
+optimizer_runs = 10000
 
 [rpc_endpoints]
 world_chain_testnet = "https://worldchain-sepolia.g.alchemy.com/public"

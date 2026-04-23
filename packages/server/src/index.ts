@@ -230,7 +230,7 @@ async function resolvePaymentTarget(paperId: string, kind: TrialKind): Promise<{
     const onchain = await getPaperFromChain(paperId as `0x${string}`);
     if (onchain?.author) {
       payTo = onchain.author as `0x${string}`;
-      amount = kind === 'full' ? onchain.pricePerFull : onchain.pricePerQuery;
+      amount = kind === 'full' ? onchain.priceFull : onchain.priceQuery;
       return { payTo, amount };
     }
     const meta = await getPaperMetadata(paperId);
