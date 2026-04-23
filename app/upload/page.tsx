@@ -92,39 +92,37 @@ export default function UploadPage() {
         addLog('Iniciando búsqueda de verify() en 2s...');
         setTimeout(async () => {
           try {
-            const mini = (MiniKit as any);
+            const MiniKitClass = (MiniKit as any);
             let verifyFn = null;
+            let activeInstance = null;
 
-            // 1. Probar en el objeto activo (Lo más probable en v2)
-            if (typeof mini['getActiveMiniKit'] === 'function') {
-              try {
-                const active = mini['getActiveMiniKit']();
-                addLog(`Inspeccionando Active...`);
-                if (active && typeof active['verify'] === 'function') {
-                  verifyFn = active['verify'].bind(active);
-                  addLog('¡HALLADO! verify() en Active');
-                }
-              } catch(e) {
-                addLog('Error al llamar getActiveMiniKit');
+            addLog('Obteniendo instancia activa...');
+            if (typeof MiniKitClass['getActiveMiniKit'] === 'function') {
+              activeInstance = MiniKitClass['getActiveMiniKit']();
+            }
+
+            if (activeInstance) {
+              addLog('Instancia hallada. Buscando verify...');
+              // Listar funciones de la instancia para Render
+              const instanceFuncs = Object.getOwnPropertyNames(Object.getPrototypeOf(activeInstance))
+                .filter(f => typeof (activeInstance as any)[f] === 'function');
+              addLog(`Funciones en Instancia: ${instanceFuncs.join(', ')}`);
+
+              if (typeof (activeInstance as any)['verify'] === 'function') {
+                verifyFn = (activeInstance as any)['verify'].bind(activeInstance);
+                addLog('¡ÉXITO! Hallado verify() en la instancia.');
               }
             }
 
-            // 2. Probar acceso directo si no se halló en active
+            // Fallback si no hay instancia o no tiene verify
             if (!verifyFn) {
-              if (typeof mini['verify'] === 'function') {
-                verifyFn = mini['verify'];
-                addLog('Detectado: MiniKit.verify');
-              } else if (typeof mini['verifyPayload'] === 'function') {
-                verifyFn = mini['verifyPayload'];
-                addLog('Detectado: MiniKit.verifyPayload');
-              }
+              addLog('Buscando fallback en Clase...');
+              verifyFn = MiniKitClass['verify'] || MiniKitClass['verifyPayload'];
             }
 
             if (typeof verifyFn !== 'function') {
-              addLog('ERROR: verify() no hallado. Enviando reporte seguro...');
-              const safeKeys = Object.getOwnPropertyNames(mini).filter(k => k !== 'commands' && k !== 'commandsAsync');
-              addLog(`Disponibles: ${safeKeys.join(', ')}`);
-              throw new Error('Función de verificación no encontrada en esta versión.');
+              addLog('ERROR FINAL: No se encontró verify() en ningún sitio.');
+              throw new Error('Función de verificación no disponible. Revisa los logs de Render.');
             }
 
             addLog('Lanzando World ID...');
