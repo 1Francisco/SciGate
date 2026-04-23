@@ -394,10 +394,8 @@ app.post('/api/world-id/rp-context', async (c) => {
 
     const sigData = signRequest({
       signingKeyHex: WORLD_ID_SIGNING_KEY,
-      app_id: targetAppId,
-      action: action,
-      signal: signal,
-      verification_level: 'device',
+      // We omit action and signal to generate a generic app-level signature
+      // which is more compatible with production World App v4 policies
     } as any);
 
     return c.json({
