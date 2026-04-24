@@ -11,8 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? process.env.WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? process.env.PAPER_REGISTRY_ADDRESS ?? '';
-const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? process.env.WORLD_APP_ID ?? 'app_aacdf4487837b144901774135e3b0803') as `app_${string}`;
-const RP_ID = process.env.NEXT_PUBLIC_WORLD_RP_ID ?? process.env.NEXT_PUBLIC_RP_ID ?? process.env.WORLD_ID_RP_ID ?? process.env.RP_ID ?? 'rp_e2b239675f4bd84b';
+const WORLD_APP_ID = process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -83,36 +82,15 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Obtener firma RP del backend ──
-      addLog('Paso 2: Obteniendo firma RP...');
-      
-      const rpSigRes = await fetch(`${API_URL}/api/world-id/rp-context`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: WORLD_ACTION_ID,
-          signal: address.toLowerCase(),
-          app_id: WORLD_APP_ID
-        }),
-      });
-
-      if (!rpSigRes.ok) {
-        const errorText = await rpSigRes.text();
-        throw new Error(`Falla en backend RP: ${errorText}`);
-      }
-
-      const rpSig = await rpSigRes.json();
-      addLog('Firma RP obtenida ✓');
-
-      // ── PASO 3: Lanzar verificación World ID ──
-      addLog('Paso 3: Lanzando Verificación...');
+      // ── PASO 2: Lanzar verificación World ID ──
+      addLog('Paso 2: Lanzando Verificación...');
       
       let idkitResult: any = null;
 
       if (MiniKit.isInstalled()) {
         // --- MODO TELÉFONO (MiniKit) ---
         addLog('Usando MiniKit Nativo...');
-        const verifyRes = await (MiniKit as any).commands.verify({
+        const verifyRes = await (MiniKit as any).verify({
           action: WORLD_ACTION_ID,
           signal: address.toLowerCase(),
         });
@@ -122,20 +100,13 @@ export default function UploadPage() {
         }
         idkitResult = verifyRes.finalPayload;
         addLog('Verificación MiniKit OK ✓');
-
       } else {
         // --- MODO NAVEGADOR (IDKit + Simulator) ---
-        addLog('Usando IDKit (Navegador)...');
+        addLog('Usando IDKit Anónimo (Navegador)...');
+        
         const idkitPayload = {
           app_id: WORLD_APP_ID, 
           action: WORLD_ACTION_ID, 
-          rp_context: {
-            rp_id: RP_ID,
-            nonce: rpSig.nonce,
-            created_at: rpSig.created_at,
-            expires_at: rpSig.expires_at,
-            signature: rpSig.signature,
-          },
           allow_legacy_proofs: true,
           environment: 'staging', 
         };

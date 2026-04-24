@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const WORLD_APP_ID =
-  process.env.WORLD_APP_ID ?? process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
-const RP_ID =
-  process.env.NEXT_PUBLIC_WORLD_RP_ID ?? process.env.RP_ID ?? process.env.WORLD_ID_RP_ID ?? process.env.NEXT_PUBLIC_RP_ID ?? 'rp_e2b239675f4bd84b';
+const WORLD_APP_ID = process.env.WORLD_APP_ID ?? process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
+const RP_ID = ''; // Deshabilitado
 const DEMO_MODE =
   process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
