@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const WORLD_APP_ID = process.env.WORLD_APP_ID ?? process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
-const RP_ID = ''; // Deshabilitado
 const DEMO_MODE =
   process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
   // ── Legacy v3 format: proof has nullifier_hash, merkle_root, proof, verification_level ──
   const isIDKitResult = proof.protocol_version && proof.responses;
 
-  if (!RP_ID && !WORLD_APP_ID) {
+  if (!WORLD_APP_ID) {
     if (DEMO_MODE) {
       return NextResponse.json({
         success: true,
@@ -34,7 +33,7 @@ export async function POST(req: NextRequest) {
         nullifier_hash: '0x' + 'a'.repeat(64),
       });
     }
-    return NextResponse.json({ error: 'RP_ID and WORLD_APP_ID not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'WORLD_APP_ID not configured' }, { status: 500 });
   }
 
   try {

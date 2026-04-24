@@ -11,7 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? process.env.WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? process.env.PAPER_REGISTRY_ADDRESS ?? '';
-const WORLD_APP_ID = process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
+const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? process.env.WORLD_APP_ID ?? 'app_aacdf4487837b144901774135e3b0803') as `app_${string}`;
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -82,7 +82,7 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Lanzar verificación World ID (IDKit Universal) ──
+      // ── PASO 2: Lanzar verificación World ID ──
       addLog('Lanzando verificación World ID...');
       
       const idkitPayload = {
@@ -92,7 +92,6 @@ export default function UploadPage() {
         environment: 'staging', 
       };
 
-      // IDKit.request funciona en PC (QR) y en World App (Deep Link nativo)
       const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
       
       const connectorUri = (request as any).uri || (request as any).connectorUri;
