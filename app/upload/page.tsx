@@ -79,11 +79,13 @@ export default function UploadPage() {
 
       // ── PASO 2: Obtener firma RP del backend ──
       addLog('Paso 2: Obteniendo firma RP...');
+      const FULL_ACTION_ID = `${WORLD_APP_ID}:${WORLD_ACTION_ID}`;
+      
       const rpSigRes = await fetch(`${API_URL}/api/world-id/rp-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: WORLD_ACTION_ID,
+          action: FULL_ACTION_ID,
           signal: address.toLowerCase(),
           app_id: WORLD_APP_ID
         }),
@@ -101,7 +103,7 @@ export default function UploadPage() {
       
       const idkitPayload = {
         app_id: WORLD_APP_ID,
-        action: "", // Omit action for diagnostic test
+        action: FULL_ACTION_ID, 
         rp_context: {
           rp_id: rpSig.rp_id,
           nonce: rpSig.nonce,
