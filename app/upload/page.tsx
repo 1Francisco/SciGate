@@ -82,59 +82,29 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Lanzar verificación World ID ──
-      addLog('Paso 2: Lanzando Verificación...');
+      // ── PASO 2: Lanzar verificación World ID (IDKit Universal) ──
+      addLog('Lanzando verificación World ID...');
       
-      let idkitResult: any = null;
+      const idkitPayload = {
+        app_id: WORLD_APP_ID, 
+        action: WORLD_ACTION_ID, 
+        allow_legacy_proofs: true,
+        environment: 'staging', 
+      };
 
-      if (MiniKit.isInstalled()) {
-        // --- MODO DIAGNÓSTICO ---
-        const keys = Object.keys(MiniKit);
-        addLog('Comandos detectados: ' + keys.join(', '));
-
-        addLog('Usando MiniKit Nativo...');
-        
-        // Intentamos detectar el comando correcto
-        const verifyFn = (MiniKit as any).verify || (MiniKit as any).commands?.verify;
-        
-        if (typeof verifyFn !== 'function') {
-          throw new Error('No se encontró el comando verify en MiniKit. Keys: ' + keys.join(', '));
-        }
-
-        const verifyRes = await verifyFn({
-          action: WORLD_ACTION_ID,
-          signal: address.toLowerCase(),
-        });
-
-        if (!verifyRes.finalPayload.success) {
-          throw new Error('Error en MiniKit verify: ' + JSON.stringify(verifyRes.finalPayload));
-        }
-        idkitResult = verifyRes.finalPayload;
-        addLog('Verificación MiniKit OK ✓');
-      } else {
-        // --- MODO NAVEGADOR (IDKit + Simulator) ---
-        addLog('Usando IDKit Anónimo (Navegador)...');
-        
-        const idkitPayload = {
-          app_id: WORLD_APP_ID, 
-          action: WORLD_ACTION_ID, 
-          allow_legacy_proofs: true,
-          environment: 'staging', 
-        };
-
-        const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
-        
-        const connectorUri = (request as any).uri || (request as any).connectorUri;
-        if (connectorUri) {
-          addLog('COPIA AL SIMULADOR: ' + connectorUri);
-        }
-
-        const completion = await request.pollUntilCompletion({ timeout: 120000 });
-        if (!completion.success) throw new Error(`IDKit falló: ${completion.error}`);
-        
-        idkitResult = completion.result;
-        addLog('Verificación IDKit OK ✓');
+      // IDKit.request funciona en PC (QR) y en World App (Deep Link nativo)
+      const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
+      
+      const connectorUri = (request as any).uri || (request as any).connectorUri;
+      if (connectorUri) {
+        addLog('PARA EL SIMULADOR: ' + connectorUri);
       }
+
+      const completion = await request.pollUntilCompletion({ timeout: 120000 });
+      if (!completion.success) throw new Error(`IDKit falló: ${completion.error}`);
+      
+      addLog('Verificación World ID OK ✓');
+      const idkitResult = completion.result;
 
       if (!idkitResult) throw new Error('No se obtuvo resultado de verificación');
 
