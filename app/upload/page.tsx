@@ -9,10 +9,10 @@ import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
-const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? 'verify-author';
-const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? '';
-const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? 'app_aacdf4487837b144901774135e3b0803') as `app_${string}`;
-const RP_ID = process.env.NEXT_PUBLIC_RP_ID ?? 'rp_e2b239675f4bd84b';
+const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? process.env.WORLD_ACTION_ID ?? 'verify-author';
+const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? process.env.PAPER_REGISTRY_ADDRESS ?? '';
+const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? process.env.WORLD_APP_ID ?? 'app_aacdf4487837b144901774135e3b0803') as `app_${string}`;
+const RP_ID = process.env.NEXT_PUBLIC_WORLD_RP_ID ?? process.env.NEXT_PUBLIC_RP_ID ?? process.env.WORLD_ID_RP_ID ?? process.env.RP_ID ?? 'rp_e2b239675f4bd84b';
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -120,7 +120,7 @@ export default function UploadPage() {
           signature: rpSig.signature,
         },
         allow_legacy_proofs: true,
-        environment: 'staging',
+        environment: 'staging', // MODO HÍBRIDO: Verificación en Staging (Simulator/No-Orb)
       };
       
       const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
@@ -144,7 +144,7 @@ export default function UploadPage() {
         throw new Error(`Verificación World ID fallida: ${completion.error}`);
       }
 
-      addLog('World ID verificado ✓');
+      addLog('World ID verificado en STAGING ✓');
       const idkitResult = completion.result;
 
       // ── PASO 4: Registrar en Smart Contract ──
@@ -204,7 +204,7 @@ export default function UploadPage() {
 
       const response = await MiniKit.sendTransaction({
         transactions: [{ to: PAPER_REGISTRY_ADDRESS as `0x${string}`, data: calldata, value: '0' }],
-        chainId: 480,
+        chainId: 480, // MODO HÍBRIDO: Dinero REAL en World Chain Mainnet
       });
 
       const txId = (response as any).data?.transactionId || (response as any).data?.transactionHash;
