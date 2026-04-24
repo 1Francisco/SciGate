@@ -393,12 +393,19 @@ app.post('/api/world-id/rp-context', async (c) => {
     }
 
     // ── MANUAL V4 SIGNING (No Ethereum Prefix) ──
-    const nonce = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+    const hashToField = (data: Uint8Array) => {
+      const hash = keccak256(data);
+      return (BigInt(hash) >> 8n).toString(16).padStart(64, '0');
+    };
+
+    const rawNonce = crypto.getRandomValues(new Uint8Array(32));
+    const nonceField = hashToField(rawNonce);
+    const nonce = `0x${nonceField}`;
+    
     const createdAt = Math.floor(Date.now() / 1000);
     const expiresAt = createdAt + 300; // 5 minutes
 
     // 1. Build the message buffer
-    // Version (1) + Nonce (32) + CreatedAt (8) + ExpiresAt (8) + Action (32)
     const versionByte = new Uint8Array([1]);
     const nonceBytes = hexToBytes(nonce as `0x${string}`);
     const createdAtBytes = new Uint8Array(8);
@@ -406,28 +413,25 @@ app.post('/api/world-id/rp-context', async (c) => {
     const expiresAtBytes = new Uint8Array(8);
     new DataView(expiresAtBytes.buffer).setBigUint64(0, BigInt(expiresAt), false);
     
-    // Hash the action to a field element (keccak256 >> 8)
-    // Note: World ID v4 uses keccak256(action) >> 8 as a field element
-    const actionHash = keccak256(toBytes(action));
-    const actionField = hexToBytes((BigInt(actionHash) >> 8n).toString(16).padStart(64, '0') as `0x${string}`);
+    const actionField = hashToField(toBytes(action));
+    const actionBytes = hexToBytes(`0x${actionField}`);
     
     const message = concatBytes([
       versionByte,
       nonceBytes,
       createdAtBytes,
       expiresAtBytes,
-      actionField
+      actionBytes
     ]);
 
     // 2. Sign the raw hash (WITHOUT Ethereum prefix)
     const hash = keccak256(message);
     const account = privateKeyToAccount(WORLD_ID_SIGNING_KEY as `0x${string}`);
-    // sign() without prefix, return only the hex string
-    const signatureHex = (await account.sign({ hash }));
+    const signatureHex = await account.sign({ hash });
 
     return c.json({
       rp_id: WORLD_ID_RP_ID,
-      nonce: nonce.replace('0x', ''),
+      nonce: nonce,
       signature: signatureHex,
       created_at: createdAt,
       expires_at: expiresAt,
