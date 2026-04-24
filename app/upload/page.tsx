@@ -101,11 +101,13 @@ export default function UploadPage() {
       // ── PASO 3: Lanzar verificación World ID vía IDKit ──
       addLog('Paso 3: Lanzando World ID (IDKit)...');
       
+      const safeRpId = rpSig.rp_id || RP_ID;
+      
       const idkitPayload = {
-        app_id: WORLD_APP_ID,
+        app_id: safeRpId, // Use RP_ID as app_id for legacy bridge compatibility
         action: FULL_ACTION_ID, 
         rp_context: {
-          rp_id: rpSig.rp_id,
+          rp_id: safeRpId,
           nonce: rpSig.nonce,
           created_at: rpSig.created_at,
           expires_at: rpSig.expires_at,
