@@ -52,26 +52,32 @@ export default function UploadPage() {
     setError('');
     addLog('--- INICIANDO FLUJO ---');
     
-    if (!MiniKit.isInstalled()) {
-      setError('Por favor, abre esta app dentro de World App.');
-      addLog('Error: MiniKit no instalado');
-      return;
-    }
+    // if (!MiniKit.isInstalled()) {
+    //   setError('Por favor, abre esta app dentro de World App.');
+    //   addLog('Error: MiniKit no instalado');
+    //   return;
+    // }
 
     try {
       // ── PASO 1: Obtener wallet vía walletAuth ──
-      addLog('Paso 1: Solicitando walletAuth...');
-      const authRes = await (MiniKit as any).walletAuth({
-        nonce: Math.random().toString(36).substring(2),
-        requestId: 'scigate_auth',
-        expirationTime: new Date(Date.now() + 1000 * 60 * 60),
-      });
+      let address = '';
+      if (MiniKit.isInstalled()) {
+        const authRes = await (MiniKit as any).walletAuth({
+          nonce: Math.random().toString(36).substring(2),
+          requestId: 'scigate_auth',
+          expirationTime: new Date(Date.now() + 1000 * 60 * 60),
+        });
+        address = authRes.data?.address;
+      } else {
+        addLog('MiniKit no detectado, usando wallet de prueba...');
+        address = '0x1234567890123456789012345678901234567890'; // Dirección de prueba
+      }
 
-      if (!authRes.data?.address) {
+      if (!address) {
         throw new Error('No se obtuvo dirección de wallet');
       }
 
-      const address = authRes.data.address;
+
       addLog(`Wallet OK: ${address.slice(0, 10)}...`);
       setWalletAddress(address);
       setWalletConfirmed(true);
@@ -114,7 +120,7 @@ export default function UploadPage() {
           signature: rpSig.signature,
         },
         allow_legacy_proofs: true,
-        environment: 'production',
+        environment: 'staging',
       };
       
       const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
