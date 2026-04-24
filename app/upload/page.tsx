@@ -83,27 +83,50 @@ export default function UploadPage() {
       setIsVerifying(true);
 
       // ── PASO 2: Lanzar verificación World ID ──
-      addLog('Lanzando verificación World ID...');
+      addLog('Lanzando Verificación...');
       
-      const idkitPayload = {
-        app_id: WORLD_APP_ID, 
-        action: WORLD_ACTION_ID, 
-        allow_legacy_proofs: true,
-        environment: 'staging', 
-      };
+      let idkitResult: any = null;
 
-      const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
-      
-      const connectorUri = (request as any).uri || (request as any).connectorUri;
-      if (connectorUri) {
-        addLog('PARA EL SIMULADOR: ' + connectorUri);
+      if (MiniKit.isInstalled()) {
+        // --- MODO TELÉFONO (MiniKit Nativo) ---
+        // Este modo NO debería pedirte rp_id porque estás dentro de la App
+        addLog('Usando MiniKit Nativo (Sin RP ID)...');
+        const verifyRes = await (MiniKit as any).verify({
+          action: WORLD_ACTION_ID,
+          signal: address.toLowerCase(),
+        });
+
+        if (!verifyRes.finalPayload.success) {
+          throw new Error('Error en MiniKit: ' + JSON.stringify(verifyRes.finalPayload));
+        }
+        idkitResult = verifyRes.finalPayload;
+        addLog('Verificación MiniKit OK ✓');
+
+      } else {
+        // --- MODO NAVEGADOR (IDKit / Simulador) ---
+        addLog('Modo Navegador detectado.');
+        addLog('ADVERTENCIA: El simulador en PC requiere RP_ID por seguridad.');
+        
+        const idkitPayload = {
+          app_id: WORLD_APP_ID, 
+          action: WORLD_ACTION_ID, 
+          allow_legacy_proofs: true,
+          environment: 'staging', 
+        };
+
+        const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
+        
+        const connectorUri = (request as any).uri || (request as any).connectorUri;
+        if (connectorUri) {
+          addLog('URI PARA SIMULADOR: ' + connectorUri);
+        }
+
+        const completion = await request.pollUntilCompletion({ timeout: 120000 });
+        if (!completion.success) throw new Error(`IDKit falló: ${completion.error}`);
+        
+        idkitResult = completion.result;
+        addLog('Verificación IDKit OK ✓');
       }
-
-      const completion = await request.pollUntilCompletion({ timeout: 120000 });
-      if (!completion.success) throw new Error(`IDKit falló: ${completion.error}`);
-      
-      addLog('Verificación World ID OK ✓');
-      const idkitResult = completion.result;
 
       if (!idkitResult) throw new Error('No se obtuvo resultado de verificación');
 
