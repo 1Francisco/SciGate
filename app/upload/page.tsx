@@ -83,42 +83,12 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Obtener firma RP del backend ──
-      addLog('Paso 2: Obteniendo firma RP...');
-      const FULL_ACTION_ID = `${WORLD_APP_ID}:${WORLD_ACTION_ID}`;
-      
-      const rpSigRes = await fetch(`${API_URL}/api/world-id/rp-context`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: WORLD_ACTION_ID,
-          signal: address.toLowerCase(),
-          app_id: WORLD_APP_ID
-        }),
-      });
-
-      if (!rpSigRes.ok) {
-        throw new Error('No se pudo obtener la firma RP del backend');
-      }
-
-      const rpSig = await rpSigRes.json();
-      addLog('Firma RP obtenida ✓');
-
-      // ── PASO 3: Lanzar verificación World ID vía IDKit ──
-      addLog('Paso 3: Lanzando World ID (IDKit)...');
-      
-      const safeRpId = rpSig.rp_id || RP_ID;
+      // ── PASO 2: (Omitido) Usando flujo Anónimo para evitar input_error ──
+      addLog('Usando flujo Anónimo (sin RP ID)...');
       
       const idkitPayload = {
         app_id: WORLD_APP_ID, 
         action: WORLD_ACTION_ID, 
-        rp_context: {
-          rp_id: safeRpId,
-          nonce: rpSig.nonce,
-          created_at: rpSig.created_at,
-          expires_at: rpSig.expires_at,
-          signature: rpSig.signature,
-        },
         allow_legacy_proofs: true,
         environment: 'staging', // MODO HÍBRIDO: Verificación en Staging (Simulator/No-Orb)
       };
