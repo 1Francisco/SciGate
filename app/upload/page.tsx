@@ -104,48 +104,57 @@ export default function UploadPage() {
       const rpSig = await rpSigRes.json();
       addLog('Firma RP obtenida ✓');
 
-      // ── PASO 3: Lanzar verificación World ID vía IDKit ──
-      addLog('Paso 3: Lanzando World ID (IDKit)...');
+      // ── PASO 3: Lanzar verificación World ID ──
+      addLog('Paso 3: Lanzando Verificación...');
       
-      const idkitPayload = {
-        app_id: WORLD_APP_ID, 
-        action: WORLD_ACTION_ID, 
-        rp_context: {
-          rp_id: RP_ID, // Usamos el ID configurado
-          nonce: rpSig.nonce,
-          created_at: rpSig.created_at,
-          expires_at: rpSig.expires_at,
-          signature: rpSig.signature,
-        },
-        allow_legacy_proofs: true,
-        environment: 'staging', 
-      };
-      
-      addLog(`Enviando RP_ID: ${RP_ID}`);
-      
-      const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
-      
-      // EXTRAER URI PARA EL SIMULADOR
-      const connectorUri = (request as any).uri || (request as any).connectorUri;
-      if (connectorUri) {
-        addLog('------------------------------------');
-        addLog('COPIA ESTO AL SIMULADOR:');
-        addLog(connectorUri);
-        addLog('------------------------------------');
+      let idkitResult: any = null;
+
+      if (MiniKit.isInstalled()) {
+        // --- MODO TELÉFONO (MiniKit) ---
+        addLog('Usando MiniKit Nativo...');
+        const verifyRes = await (MiniKit as any).commands.verify({
+          action: WORLD_ACTION_ID,
+          signal: address.toLowerCase(),
+        });
+
+        if (!verifyRes.finalPayload.success) {
+          throw new Error('Error en MiniKit verify');
+        }
+        idkitResult = verifyRes.finalPayload;
+        addLog('Verificación MiniKit OK ✓');
+
       } else {
-        addLog('No se pudo obtener el código QR automáticamente.');
-      }
-      
-      addLog('Esperando verificación del usuario...');
-      const completion = await request.pollUntilCompletion({ timeout: 120000 });
+        // --- MODO NAVEGADOR (IDKit + Simulator) ---
+        addLog('Usando IDKit (Navegador)...');
+        const idkitPayload = {
+          app_id: WORLD_APP_ID, 
+          action: WORLD_ACTION_ID, 
+          rp_context: {
+            rp_id: RP_ID,
+            nonce: rpSig.nonce,
+            created_at: rpSig.created_at,
+            expires_at: rpSig.expires_at,
+            signature: rpSig.signature,
+          },
+          allow_legacy_proofs: true,
+          environment: 'staging', 
+        };
 
-      if (!completion.success) {
-        addLog(`World ID falló: ${completion.error}`);
-        throw new Error(`Verificación World ID fallida: ${completion.error}`);
+        const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: address.toLowerCase() }));
+        
+        const connectorUri = (request as any).uri || (request as any).connectorUri;
+        if (connectorUri) {
+          addLog('COPIA AL SIMULADOR: ' + connectorUri);
+        }
+
+        const completion = await request.pollUntilCompletion({ timeout: 120000 });
+        if (!completion.success) throw new Error(`IDKit falló: ${completion.error}`);
+        
+        idkitResult = completion.result;
+        addLog('Verificación IDKit OK ✓');
       }
 
-      addLog('World ID verificado en STAGING ✓');
-      const idkitResult = completion.result;
+      if (!idkitResult) throw new Error('No se obtuvo resultado de verificación');
 
       // ── PASO 4: Registrar en Smart Contract ──
       addLog('Paso 4: Registrando en blockchain...');
