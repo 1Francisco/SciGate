@@ -66,7 +66,13 @@ export default function UploadPage() {
       formData.append('file', file);
       const ragRes = await fetch('/api/rag/upload', { method: 'POST', body: formData });
       const ragData = await ragRes.json();
+      
+      if (!ragData || !ragData.hash) {
+        throw new Error('Failed to get content hash from RAG service.');
+      }
+
       const contentHash = ragData.hash;
+      addLog(`Content hash received: ${contentHash.substring(0, 10)}...`);
       const paperIdStr = Math.floor(Math.random() * 1000000).toString();
 
       addLog('Preparing v2 transaction...');
