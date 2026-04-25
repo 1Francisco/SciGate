@@ -83,50 +83,32 @@ export default function UploadPage() {
       }
       const paperIdStr = Math.floor(Math.random() * 1000000).toString();
 
-      addLog('Preparing v2 transaction...');
+      addLog('Registering in SciGate Cloud...');
       
-      const priceQueryUnits = parseUnits(priceQuery, 6);
-      const priceFullUnits  = parseUnits(priceFull, 6);
-      const trainingPrice   = parseUnits('0.15', 6);
-
-      // ENCODE THE FUNCTION (Required in v2)
-      const callData = encodeFunctionData({
-        abi: PAPER_REGISTRY_ABI,
-        functionName: 'registerPaper',
-        args: [contentHash as `0x${string}`, `ipfs://demo/${paperIdStr}`, priceQueryUnits, priceFullUnits, trainingPrice],
-      });
-
-      const handleTxResponse = async (payload: any) => {
-        (MiniKit as any).unsubscribe('send_transaction', handleTxResponse);
-        addLog('Transaction result', payload);
-        if (payload.status === 'success') {
-          addLog('Transaction successful! ✓');
-          setStep('success');
-        } else {
-          addLog('Transaction failed ✗');
-          setError('The transaction could not be completed.');
-        }
-        setUploading(false);
-      };
-
-      (MiniKit as any).subscribe('send_transaction', handleTxResponse);
-
-      addLog('Sending to World Chain (480)...');
       try {
-        (MiniKit as any).sendTransaction({
-          chainId: WORLD_CHAIN_ID,
-          transactions: [{
-            to: PAPER_REGISTRY_ADDRESS,
-            data: callData,
-            value: '0',
-          }],
+        const response = await fetch(`${RENDER_URL}/authors/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            wallet_address: walletAddress,
+            world_id_proof: worldIdProof,
+            paper_hash: contentHash,
+            title: file?.name?.replace('.pdf', '') || 'Uploaded Paper',
+            price_query: priceQuery,
+            price_full: priceFull
+          }),
         });
-      } catch (sendErr: any) {
-        addLog('Send Error:', sendErr.message);
-        setError('Failed to trigger wallet modal.');
+
+        if (!response.ok) throw new Error('Database sync failed');
+        
+        addLog('Cloud registration complete ✓');
+        setStep('success');
+      } catch (dbErr: any) {
+        addLog('Sync Error:', dbErr.message);
+        setError('Failed to save to database. Please try again.');
+      } finally {
         setUploading(false);
       }
-
     } catch (err: any) {
       setError(err.message);
       addLog('Error during upload', err.message);
