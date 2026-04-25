@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { useReadContract } from 'wagmi';
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
-const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'https://scigate.onrender.com';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS;
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const DEMO_MODE = true; // Forzado para Hackathon
 
 const MOCK_PAPERS = [
   { contentHash: '0xabcd1234...', title: 'Attention Is All You Need', totalEarnings: '145000', totalAccesses: 14, active: true },
@@ -33,7 +33,7 @@ export default function DashboardPage() {
     setLoading(true);
     setUseMock(false);
     try {
-      const res = await fetch(`/api/authors/${walletAddress}/papers`);
+      const res = await fetch(`${API_URL}/authors/${walletAddress}/papers`);
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
       const data = await res.json();
       
@@ -95,7 +95,7 @@ export default function DashboardPage() {
       const res: any = await new Promise((resolve, reject) => {
         const handleAuth = (payload: any) => {
           (MiniKit as any).unsubscribe('wallet_auth', handleAuth);
-          fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Dashboard Auth Res', data: payload }) }).catch(() => {});
+          fetch(`${API_URL}/api/debug`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Dashboard Auth Res', data: payload }) }).catch(() => {});
           if (payload.status === 'error') reject(new Error(payload.error_code));
           else resolve(payload);
         };
@@ -192,27 +192,29 @@ export default function DashboardPage() {
                 </div>
               )}
               
-              {DEMO_MODE && (
-                <button
-                  onClick={() => {
-                    setWalletAddress('0x0000000000000000000000000000000000000001');
-                    setTimeout(loadDashboard, 0);
-                  }}
-                  style={{
-                    marginTop: 24,
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    textDecoration: 'underline',
-                  }}
-                >
-                  Use demo data for presentation
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setWalletAddress('0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7');
+                  setTimeout(loadDashboard, 0);
+                }}
+                style={{
+                  marginTop: 24,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  textDecoration: 'underline',
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'center'
+                }}
+              >
+                Use demo wallet (View my uploaded papers)
+              </button>
             </div>
           )}
+
 
           {loading && (
             <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
