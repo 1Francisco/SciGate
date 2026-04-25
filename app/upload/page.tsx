@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { parseUnits, encodeFunctionData } from 'viem';
 import { MiniKit } from '@worldcoin/minikit-js';
-import { IDKit, CredentialRequest, any, deviceLegacy } from '@worldcoin/idkit-core';
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
@@ -12,7 +11,6 @@ const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? process.env.WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? process.env.PAPER_REGISTRY_ADDRESS ?? '';
 const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? process.env.WORLD_APP_ID ?? 'app_8d3e4ef96e0ef911d19e2e42107b16fb') as `app_${string}`;
-const RP_ID = process.env.NEXT_PUBLIC_WORLD_RP_ID ?? process.env.NEXT_PUBLIC_RP_ID ?? process.env.WORLD_ID_RP_ID ?? process.env.RP_ID ?? 'rp_9ca69f8de419f87b';
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -83,62 +81,38 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Lanzar verificación World ID ──
-      addLog('Lanzando Verificación...');
-      
-      let idkitResult: any = null;
 
-      // ── PASO 2: Obtener firma RP del backend (World ID 4.0) ──
-      addLog('Preparando firma World ID v4...');
-      const rpSigRes = await fetch('/api/rp-signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: WORLD_ACTION_ID,
-        }),
-      });
+      // ── PASO 2: Verificación World ID (MiniKit v1 — Sin RP ID) ──
+      addLog('Lanzando verificación World ID...');
 
-      if (!rpSigRes.ok) {
-        const errData = await rpSigRes.json().catch(() => ({}));
-        throw new Error('Error firma RP: ' + (errData.error || rpSigRes.status));
+      if (!MiniKit.isInstalled()) {
+        throw new Error('Abre esta app dentro de World App para verificarte.');
       }
-      const rpSig = await rpSigRes.json();
-      addLog('Firma v4 obtenida ✓');
 
-      // ── PASO 3: Lanzar verificación IDKit ──
-      addLog('Lanzando Verificación...');
-      
-      const idkitPayload = {
-        app_id: WORLD_APP_ID, 
-        action: WORLD_ACTION_ID, 
-        rp_context: {
-          rp_id: rpSig.rp_id || RP_ID,
-          nonce: rpSig.nonce,
-          created_at: rpSig.created_at,
-          expires_at: rpSig.expires_at,
-          signature: rpSig.signature,
-        },
-        allow_legacy_proofs: true,
-        environment: 'staging', 
+      const verifyPayload = {
+        action: WORLD_ACTION_ID,
+        signal: address.toLowerCase(),
       };
 
-      const request = await IDKit.request(idkitPayload as any).preset(deviceLegacy({ signal: 'scigate-auth-v1' }));
+      addLog('Esperando respuesta de World App...');
+      const verifyRes: any = await MiniKit.commands.verify(verifyPayload);
       
-      const connectorUri = (request as any).uri || (request as any).connectorUri;
-      if (connectorUri) {
-        addLog('PARA EL SIMULADOR: ' + connectorUri);
+      if (!verifyRes?.finalPayload) {
+        throw new Error('No se recibió respuesta de World ID');
       }
 
-      const completion = await request.pollUntilCompletion({ timeout: 120000 });
-      if (!completion.success) throw new Error(`Verificación fallida: ${completion.error}`);
-      
-      idkitResult = completion.result;
+      const idkitResult = verifyRes.finalPayload;
 
-      if (!idkitResult) throw new Error('No se obtuvo resultado de verificación');
+      if (idkitResult.status === 'error') {
+        throw new Error('Verificación rechazada: ' + (idkitResult.error_code || 'unknown'));
+      }
+
+      addLog('Verificación World ID OK ✓');
+
 
       // ── PASO 4: Registrar en Smart Contract ──
       addLog('Paso 4: Registrando en blockchain...');
-      const verifyRes = await fetch('/api/verify', {
+      const backendRes = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,7 +121,7 @@ export default function UploadPage() {
         }),
       });
 
-      const verifyData = await verifyRes.json();
+      const verifyData = await backendRes.json();
       if (verifyData.success) {
         addLog('¡VERIFICACIÓN COMPLETA! ✓✓✓');
         setWorldIdProof(idkitResult);
@@ -185,15 +159,20 @@ export default function UploadPage() {
       const priceFullUnits  = parseUnits(priceFull, 6);
       const trainingPrice   = parseUnits('0.15', 6);
 
-      const calldata = encodeFunctionData({
-        abi: PAPER_REGISTRY_ABI,
-        functionName: 'registerPaper',
-        args: [contentHash as `0x${string}`, `ipfs://placeholder/${paperIdStr}`, priceQueryUnits, priceFullUnits, trainingPrice],
-      });
 
-      const response = await MiniKit.sendTransaction({
-        transactions: [{ to: PAPER_REGISTRY_ADDRESS as `0x${string}`, data: calldata, value: '0' }],
-        chainId: 480, // MODO HÍBRIDO: Dinero REAL en World Chain Mainnet
+      const response: any = await MiniKit.commands.sendTransaction({
+        transaction: [{
+          address: PAPER_REGISTRY_ADDRESS as string,
+          abi: PAPER_REGISTRY_ABI as any,
+          functionName: 'registerPaper',
+          args: [
+            contentHash as string, 
+            `ipfs://placeholder/${paperIdStr}`, 
+            priceQueryUnits.toString(), 
+            priceFullUnits.toString(), 
+            trainingPrice.toString()
+          ],
+        }],
       });
 
       const txId = (response as any).data?.transactionId || (response as any).data?.transactionHash;
