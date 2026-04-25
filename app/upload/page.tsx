@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { parseUnits } from 'viem';
+import { parseUnits, encodeFunctionData } from 'viem';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const WORLD_ACTION_ID = "verify-author";
-const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? '';
+const PAPER_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS as `0x${string}`) ?? '0x0000000000000000000000000000000000000000';
 const RENDER_URL = 'https://scigate.onrender.com';
+const WORLD_CHAIN_ID = 480;
 
 type Step = 'verify' | 'upload' | 'success';
 
@@ -37,16 +38,12 @@ export default function UploadPage() {
 
   const handleDetectAndVerify = async () => {
     setError('');
-    addLog('--- INICIANDO FLUJO v2 (Clean) ---');
+    addLog('--- INICIANDO VERIFICACIÓN v2 ---');
     
     try {
-      // 1. Introspección
-      const methods = Object.getOwnPropertyNames(MiniKit).filter(k => typeof (MiniKit as any)[k] === 'function');
-      addLog('Métodos detectados: ' + methods.join(', '));
-
       let address = MiniKit.user?.walletAddress || '';
       if (!address) {
-        addLog('Usando wallet respaldo.');
+        addLog('Pidiendo wallet de respaldo.');
         address = '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7';
       }
 
@@ -58,10 +55,9 @@ export default function UploadPage() {
         signal: address.toLowerCase(),
       };
 
-      // 2. Definir handler ANTES de llamar
       const handleVerifyResponse = async (payload: any) => {
         (MiniKit as any).unsubscribe('verify', handleVerifyResponse);
-        addLog('Respuesta recibida', payload);
+        addLog('Respuesta modal recibida', payload);
 
         if (payload.status === 'error') {
           addLog(`Error en modal: ${payload.error_code}`);
@@ -82,7 +78,7 @@ export default function UploadPage() {
           const verifyData = await backendRes.json();
           if (!verifyData.success) throw new Error(verifyData.error || 'Fallo backend');
           
-          addLog('Registro exitoso.');
+          addLog('Registro en backend exitoso ✓');
           setStep('upload');
         } catch (e: any) {
           setError(e.message);
@@ -94,8 +90,7 @@ export default function UploadPage() {
 
       (MiniKit as any).subscribe('verify', handleVerifyResponse);
 
-      // 3. Lanzar verificación (DIRECTO, sin tocar .commands)
-      addLog('Lanzando .verify() directo...');
+      addLog('Lanzando World ID...');
       (MiniKit as any).verify(verifyArgs);
 
     } catch (err: any) {
@@ -119,17 +114,24 @@ export default function UploadPage() {
       const contentHash = ragData.hash;
       const paperIdStr = Math.floor(Math.random() * 1000000).toString();
 
-      addLog('Enviando transacción...');
+      addLog('Preparando transacción v2...');
       
       const priceQueryUnits = parseUnits(priceQuery, 6);
       const priceFullUnits  = parseUnits(priceFull, 6);
       const trainingPrice   = parseUnits('0.15', 6);
 
+      // CODIFICAR LA FUNCIÓN (Requerido en v2)
+      const callData = encodeFunctionData({
+        abi: PAPER_REGISTRY_ABI,
+        functionName: 'registerPaper',
+        args: [contentHash, `ipfs://demo/${paperIdStr}`, priceQueryUnits, priceFullUnits, trainingPrice],
+      });
+
       const handleTxResponse = async (payload: any) => {
         (MiniKit as any).unsubscribe('send_transaction', handleTxResponse);
-        addLog('Tx Response', payload);
+        addLog('Resultado transacción', payload);
         if (payload.status === 'success') {
-          addLog('Transacción exitosa ✓');
+          addLog('¡Transacción exitosa! ✓');
           setStep('success');
         } else {
           addLog('Transacción fallida ✗');
@@ -140,12 +142,13 @@ export default function UploadPage() {
 
       (MiniKit as any).subscribe('send_transaction', handleTxResponse);
 
+      addLog('Enviando a World Chain (480)...');
       (MiniKit as any).sendTransaction({
-        transaction: [{
-          address: PAPER_REGISTRY_ADDRESS,
-          abi: PAPER_REGISTRY_ABI,
-          functionName: 'registerPaper',
-          args: [contentHash, `ipfs://demo/${paperIdStr}`, priceQueryUnits.toString(), priceFullUnits.toString(), trainingPrice.toString()],
+        chainId: WORLD_CHAIN_ID,
+        transactions: [{
+          to: PAPER_REGISTRY_ADDRESS,
+          data: callData,
+          value: '0',
         }],
       });
 
