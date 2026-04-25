@@ -116,12 +116,14 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
       const txResponse: any = await new Promise((resolve, reject) => {
         const handleTxResponse = (payload: any) => {
           (MiniKit as any).unsubscribe('send_transaction', handleTxResponse);
+          fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Card Tx Res', data: payload }) }).catch(() => {});
           if (payload.status === 'error') reject(new Error(payload.error_code));
           else resolve(payload);
         };
         (MiniKit as any).subscribe('send_transaction', handleTxResponse);
 
-        (MiniKit as any).commands.sendTransaction({
+        // CAMBIO: Bypass de tipos para llamada directa
+        (MiniKit as any).sendTransaction({
           transaction: [{
             address: USDC_ADDRESS,
             abi: USDC_ABI as any,

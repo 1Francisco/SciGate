@@ -27,34 +27,35 @@ export default function UploadPage() {
   const [priceQuery, setPriceQuery] = useState('0.10');
   const [priceFull, setPriceFull] = useState('5.00');
 
-  const addLog = (msg: string) => {
+  const addLog = (msg: string, data?: any) => {
     setDebugLogs(prev => [msg, ...prev].slice(0, 5));
-    console.log(`[MOBILE_DEBUG] ${msg}`);
+    console.log(`[MOBILE_DEBUG] ${msg}`, data || '');
+    // Logs a Render
+    fetch('/api/debug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, data }),
+    }).catch(() => {});
   };
 
   const handleDetectAndVerify = async () => {
     setError('');
-    addLog('--- INICIANDO FLUJO v2 ---');
+    addLog('--- INICIANDO FLUJO v2 (Direct) ---');
     
     try {
-      // 1. Obtener Wallet (v2 ya tiene el usuario si está instalado)
       let address = MiniKit.user?.walletAddress || '';
-      
       if (!address) {
-        addLog('Pidiendo walletAuth...');
-        // En v2, podemos intentar forzar la detección
-        address = '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7'; // Fallback demo
-        addLog('Usando wallet de respaldo.');
+        addLog('No se detectó wallet en MiniKit.user, usando respaldo.');
+        address = '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7';
       }
 
       setWalletAddress(address);
       setIsVerifying(true);
 
-      // 2. Verificación World ID (MiniKit v2 nativo)
       addLog('Lanzando World ID modal...');
       
-      // En v2.x, el modal se lanza y el resultado llega por evento
-      (MiniKit as any).commands.verify({
+      // CAMBIO: Bypass de tipos para llamada directa
+      (MiniKit as any).verify({
         action: WORLD_ACTION_ID,
         signal: address.toLowerCase(),
       });
@@ -63,6 +64,8 @@ export default function UploadPage() {
       
       const handleVerifyResponse = async (payload: any) => {
         (MiniKit as any).unsubscribe('verify', handleVerifyResponse);
+        addLog('Respuesta modal recibida', payload);
+
         if (payload.status === 'error') {
           addLog(`Error en modal: ${payload.error_code}`);
           setError('Error en el modal de World ID');
@@ -73,7 +76,6 @@ export default function UploadPage() {
         addLog('¡Verificación OK! Registrando...');
         setWorldIdProof(payload);
 
-        // Registrar en Backend
         try {
           const backendRes = await fetch('/api/verify', {
             method: 'POST',
@@ -83,7 +85,7 @@ export default function UploadPage() {
           const verifyData = await backendRes.json();
           if (!verifyData.success) throw new Error(verifyData.error || 'Fallo backend');
           
-          addLog('Registro exitoso.');
+          addLog('Registro exitoso en el servidor.');
           setStep('upload');
         } catch (e: any) {
           setError(e.message);
@@ -96,7 +98,7 @@ export default function UploadPage() {
       (MiniKit as any).subscribe('verify', handleVerifyResponse);
 
     } catch (err: any) {
-      addLog(`Error: ${err.message}`);
+      addLog(`Error crítico: ${err.message}`);
       setError(err.message);
       setIsVerifying(false);
     }
@@ -109,7 +111,6 @@ export default function UploadPage() {
     setError('');
 
     try {
-      // (Lógica de subida RAG igual...)
       const formData = new FormData();
       formData.append('file', file);
       const ragRes = await fetch('/api/rag/upload', { method: 'POST', body: formData });
@@ -117,14 +118,14 @@ export default function UploadPage() {
       const contentHash = ragData.hash;
       const paperIdStr = Math.floor(Math.random() * 1000000).toString();
 
-      addLog('Enviando transacción a World Chain...');
+      addLog('Enviando transacción...');
       
       const priceQueryUnits = parseUnits(priceQuery, 6);
       const priceFullUnits  = parseUnits(priceFull, 6);
       const trainingPrice   = parseUnits('0.15', 6);
 
-      // Transacción vía MiniKit v2
-      (MiniKit as any).commands.sendTransaction({
+      // CAMBIO: Bypass de tipos para llamada directa
+      (MiniKit as any).sendTransaction({
         transaction: [{
           address: PAPER_REGISTRY_ADDRESS,
           abi: PAPER_REGISTRY_ABI,
@@ -135,11 +136,12 @@ export default function UploadPage() {
 
       const handleTxResponse = async (payload: any) => {
         (MiniKit as any).unsubscribe('send_transaction', handleTxResponse);
+        addLog('Resultado transacción', payload);
         if (payload.status === 'success') {
-          addLog('Transacción exitosa.');
+          addLog('Transacción exitosa ✓');
           setStep('success');
         } else {
-          addLog('Transacción fallida.');
+          addLog('Transacción fallida ✗');
           setError('La transacción no se pudo completar.');
         }
         setUploading(false);

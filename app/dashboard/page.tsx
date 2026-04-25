@@ -95,16 +95,19 @@ export default function DashboardPage() {
       const res: any = await new Promise((resolve, reject) => {
         const handleAuth = (payload: any) => {
           (MiniKit as any).unsubscribe('wallet_auth', handleAuth);
+          fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Dashboard Auth Res', data: payload }) }).catch(() => {});
           if (payload.status === 'error') reject(new Error(payload.error_code));
           else resolve(payload);
         };
         (MiniKit as any).subscribe('wallet_auth', handleAuth);
 
-        (MiniKit as any).commands.walletAuth({
+        // CAMBIO: Bypass de tipos para llamada directa
+        (MiniKit as any).walletAuth({
           nonce: Date.now().toString(),
           requestId: 'auth_detect_dash',
           expirationTime: new Date(Date.now() + 60 * 60 * 1000),
         });
+        
         setTimeout(() => { 
           (MiniKit as any).unsubscribe('wallet_auth', handleAuth);
           reject(new Error('timeout')); 

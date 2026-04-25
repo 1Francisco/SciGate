@@ -160,12 +160,14 @@ export default function ExplorePage() {
       const response: any = await new Promise((resolve, reject) => {
         const handlePayResponse = (payload: any) => {
           (MiniKit as any).unsubscribe('pay', handlePayResponse);
+          fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Explore Pay Res', data: payload }) }).catch(() => {});
           if (payload.status === 'error') reject(new Error(payload.error_code));
           else resolve(payload);
         };
         (MiniKit as any).subscribe('pay', handlePayResponse);
 
-        (MiniKit as any).commands.pay({
+        // CAMBIO: Bypass de tipos para llamada directa
+        (MiniKit as any).pay({
           reference: paymentReference,
           to: RECIPIENT,
           tokens: [{ 
