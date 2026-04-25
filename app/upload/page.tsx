@@ -60,7 +60,7 @@ export default function UploadPage() {
       // ── PASO 1: Obtener wallet vía walletAuth ──
       let address = '';
       if (MiniKit.isInstalled()) {
-        const authRes = await (MiniKit as any).walletAuth({
+        const authRes = await (MiniKit as any).commands.walletAuth({
           nonce: Math.random().toString(36).substring(2),
           requestId: 'scigate_auth',
           expirationTime: new Date(Date.now() + 1000 * 60 * 60),
