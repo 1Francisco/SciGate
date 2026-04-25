@@ -112,15 +112,14 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
     try {
       setStatus('verifying');
       addLog('Invoking MiniKit...', 'info');
-      const txData = encodeFunctionData({
-        abi: USDC_ABI,
-        functionName: 'transfer',
-        args: [scheme.payTo, BigInt(scheme.amount)],
-      });
 
-      const txResponse = await MiniKit.sendTransaction({
-        transactions: [{ to: USDC_ADDRESS, data: txData, value: '0' }],
-        chainId: 480,
+      const txResponse: any = await (MiniKit as any).commands.sendTransaction({
+        transaction: [{
+          address: USDC_ADDRESS,
+          abi: USDC_ABI as any,
+          functionName: 'transfer',
+          args: [scheme.payTo, BigInt(scheme.amount).toString()],
+        }],
       });
 
       const txId = (txResponse as any).data?.transactionId || (txResponse as any).data?.transactionHash;

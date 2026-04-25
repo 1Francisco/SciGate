@@ -157,7 +157,7 @@ export default function ExplorePage() {
         type: 'sendTransaction'
       });
 
-      const response = await MiniKit.pay({
+      const response: any = await (MiniKit as any).commands.pay({
         reference: paymentReference,
         to: RECIPIENT,
         tokens: [{ 

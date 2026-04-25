@@ -92,7 +92,7 @@ export default function DashboardPage() {
         setWalletAddress(MiniKit.user.walletAddress);
         return;
       }
-      const res = await MiniKit.walletAuth({
+      const res = await (MiniKit as any).commands.walletAuth({
         nonce: Date.now().toString(),
         requestId: 'auth_detect_dash',
         expirationTime: new Date(Date.now() + 60 * 60 * 1000),
