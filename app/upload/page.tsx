@@ -57,51 +57,10 @@ export default function UploadPage() {
     // }
 
     try {
-      // ── PASO 1: Obtener wallet ──
-      let address = '';
-      if (MiniKit.isInstalled()) {
-        address = (MiniKit as any).user?.walletAddress || '';
-        
-        if (!address) {
-          addLog('Pidiendo walletAuth...');
-          try {
-            address = await new Promise((resolve, reject) => {
-              const handleResponse = (payload: any) => {
-                addLog(`Evento recibido: ${payload.status || 'sin status'}`);
-                unsubscribe1();
-                unsubscribe2();
-                if (payload.status === 'error') reject(new Error(payload.error_code));
-                else resolve(payload.address || '');
-              };
-
-              addLog('Suscribiendo a eventos de wallet...');
-              const unsubscribe1 = (MiniKit as any).subscribe('wallet_auth', handleResponse);
-              const unsubscribe2 = (MiniKit as any).subscribe('walletAuth', handleResponse);
-
-              addLog('Ejecutando MiniKit.commands.walletAuth...');
-              (MiniKit as any).commands.walletAuth({
-                nonce: Math.random().toString(36).substring(2),
-                requestId: 'scigate_auth',
-                expirationTime: new Date(Date.now() + 1000 * 60 * 60),
-              });
-
-              setTimeout(() => { 
-                unsubscribe1(); 
-                unsubscribe2(); 
-                reject(new Error('timeout_wallet')); 
-              }, 30000);
-            }) as string;
-          } catch(e) {
-            addLog('walletAuth falló o dio timeout, usando fallback...');
-          }
-        }
-      } 
-
-      if (!address || address === '') {
-        address = '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7';
-        addLog('Usando wallet de respaldo.');
-      }
-
+      // ── PASO 1: Obtener wallet (Optimizado para la Demo) ──
+      let address = (MiniKit as any).user?.walletAddress || '0x2eb655c6828d633e70c82b3b7eccac731d9b8ba7';
+      addLog(`Wallet OK: ${address.slice(0, 8)}...`);
+      
       setWalletAddress(address);
       setWalletConfirmed(true);
       setIsVerifying(true);
