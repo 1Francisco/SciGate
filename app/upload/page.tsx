@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { parseUnits, encodeFunctionData } from 'viem';
 import { MiniKit } from '@worldcoin/minikit-js';
+import * as IDKit from '@worldcoin/idkit';
+const { IDKitWidget, VerificationLevel } = IDKit as any;
 import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
@@ -65,54 +67,38 @@ export default function UploadPage() {
       setWalletConfirmed(true);
       setIsVerifying(true);
 
-      // ── PASO 2: Verificación World ID ──
-      addLog('Lanzando verificación World ID...');
-      const idkitResult = await new Promise((resolve, reject) => {
-        const handleVerify = (payload: any) => {
-          addLog(`Verificación recibida: ${payload.status}`);
-          unsub1();
-          unsub2();
-          if (payload.status === 'error') reject(new Error(payload.error_code));
-          else resolve(payload);
-        };
+      addLog('Wallet lista. Ahora procede con World ID.');
+      // Ya no lanzamos el modal aquí, el usuario lo hará con el botón de IDKit
+    } catch (err: any) {
+      const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      addLog(`Error: ${errMsg}`);
+      setError(errMsg || 'Error inesperado');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
-        const unsub1 = (MiniKit as any).subscribe('verify', handleVerify);
-        const unsub2 = (MiniKit as any).subscribe('verify_response', handleVerify);
-
-        MiniKit.commands.verify({
-          action: WORLD_ACTION_ID,
-          signal: "", // Simplificado para evitar errores de formato en el modal
-        });
-
-        setTimeout(() => { 
-          unsub1(); 
-          unsub2(); 
-          reject(new Error('timeout_verify')); 
-        }, 120000);
-      });
-
+  const handleVerifySuccess = async (result: any) => {
+    try {
       addLog('Verificación World ID OK ✓');
+      setWorldIdProof(result);
+      setIsVerifying(true);
 
-      // ── PASO 4: Registrar en Smart Contract ──
       addLog('Paso 4: Registrando en blockchain...');
       const backendRes = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proof: idkitResult, wallet_address: address }),
+        body: JSON.stringify({ proof: result, wallet_address: walletAddress }),
       });
 
       const verifyData = await backendRes.json();
       if (!verifyData.success) throw new Error(verifyData.error || 'Backend verification failed');
 
       addLog('¡VERIFICACIÓN COMPLETA! ✓');
-      setWorldIdProof(idkitResult);
       setStep('upload');
-
     } catch (err: any) {
-      const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      addLog(`Error: ${errMsg}`);
-      setError(errMsg || 'Error inesperado');
-      setWalletConfirmed(false);
+      setError(err.message || 'Error en validación');
+      addLog(`Error: ${err.message}`);
     } finally {
       setIsVerifying(false);
     }
@@ -226,9 +212,31 @@ export default function UploadPage() {
                 </>
               ) : (
                 <div style={{ padding: '20px 0' }}>
-                  <div className="spinner" style={{ margin: '0 auto 24px' }}></div>
-                  <p style={{ color: 'var(--accent-emerald)', fontWeight: 700, fontSize: 18 }}>¡Wallet Conectada!</p>
-                  <p style={{ color: 'var(--text-secondary)' }}>Lanzando World ID automáticamente...</p>
+                  <p style={{ color: 'var(--accent-emerald)', fontWeight: 700, fontSize: 18, marginBottom: 24 }}>✓ Wallet Conectada</p>
+                  
+                  <IDKitWidget
+                    app_id={WORLD_APP_ID as `app_${string}`}
+                    action={WORLD_ACTION_ID}
+                    signal={walletAddress.toLowerCase()}
+                    onSuccess={handleVerifySuccess}
+                    verification_level={VerificationLevel.Orb}
+                  >
+                    {({ open }: any) => (
+                      <button 
+                        className="btn-primary" 
+                        onClick={open}
+                        style={{ 
+                          width: '100%', 
+                          padding: 20, 
+                          fontSize: 18,
+                          background: 'linear-gradient(45deg, #000, #333)',
+                          border: '1px solid var(--accent-emerald)'
+                        }}
+                      >
+                        Verificar con World ID 4.0 →
+                      </button>
+                    )}
+                  </IDKitWidget>
                 </div>
               )}
             </div>
