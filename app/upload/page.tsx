@@ -91,13 +91,22 @@ export default function UploadPage() {
 
       (MiniKit as any).subscribe('verify', handleVerifyResponse);
 
-      addLog('Lanzando World ID...');
-      // INTENTO SEGURO
-      if (typeof (MiniKit as any).verify === 'function') {
-        (MiniKit as any).verify(verifyArgs);
+      addLog('Lanzando World ID (Multi-ruta)...');
+      
+      const mAny = MiniKit as any;
+      if (typeof mAny.verify === 'function') {
+        addLog('Ruta: .verify()');
+        mAny.verify(verifyArgs);
+      } else if (typeof mAny.commandsAsync?.verify === 'function') {
+        addLog('Ruta: .commandsAsync.verify()');
+        mAny.commandsAsync.verify(verifyArgs);
+      } else if (typeof mAny.commands?.verify === 'function') {
+        // Solo como último recurso, aunque lance advertencia
+        addLog('Ruta: .commands.verify()');
+        mAny.commands.verify(verifyArgs);
       } else {
-        addLog('Error: .verify() no encontrado en MiniKit.');
-        setError('El SDK de Worldcoin no cargó el método de verificación.');
+        addLog('Error: No se encontró método verify en ninguna ruta.');
+        setError('No se pudo encontrar el comando de verificación en el SDK.');
         setIsVerifying(false);
       }
 
