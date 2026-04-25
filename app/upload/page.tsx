@@ -8,9 +8,9 @@ import { PAPER_REGISTRY_ABI } from '@/config/abi';
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3001';
 const RAG_URL = process.env.NEXT_PUBLIC_RAG_URL ?? 'http://localhost:8000';
-const WORLD_ACTION_ID = process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? process.env.WORLD_ACTION_ID ?? 'verify-author';
 const PAPER_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_PAPER_REGISTRY_ADDRESS ?? process.env.PAPER_REGISTRY_ADDRESS ?? '';
-const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ?? process.env.WORLD_APP_ID ?? 'app_8d3e4ef96e0ef911d19e2e42107b16fb') as `app_${string}`;
+const WORLD_APP_ID = "app_8d3e4ef96e0ef911d19e2e42107b16fb"; // VERIFICA QUE ESTÉ EN PRODUCCIÓN
+const WORLD_ACTION_ID = "scigate-auth"; // VERIFICA EL ID EXACTO EN EL PORTAL
 
 type Step = 'verify' | 'upload' | 'success';
 
