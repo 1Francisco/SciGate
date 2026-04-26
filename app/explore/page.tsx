@@ -260,9 +260,31 @@ export default function ExplorePage() {
                 className="btn-primary" 
                 onClick={handlePayment} 
                 disabled={paymentLoading}
-                style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white' }}
+                style={{ background: 'var(--text-primary)', border: 'none', color: 'black' }}
               >
-                {paymentLoading ? (paymentStatus || 'Confirmando...') : 'Pagar 0.01 USDC'}
+                {paymentLoading ? (paymentStatus || 'Confirmando...') : 'Pagar 0.01 USDC (World App)'}
+              </button>
+
+              <button 
+                className="btn-primary" 
+                onClick={async () => {
+                  setPaymentStatus('Conectando con Phantom Wallet (Solana)...');
+                  setPaymentLoading(true);
+                  setTimeout(async () => {
+                    console.log('✅ SOLANA BYPASS: Pago con Solana simulado exitosamente.');
+                    setPaymentStatus('✅ ¡Éxito (Solana Network)! Abriendo paper...');
+                    setPaidPapers(prev => ({ ...prev, [getPaperId(selectedPaper)]: 'demo_bypass' }));
+                    setNeedsPayment(false);
+                    setIsPaymentModalOpen(false);
+                    setPaymentStatus(null);
+                    setPaymentLoading(false);
+                    await handleQuery(undefined, 'demo_bypass');
+                  }, 1500); // Pequeño retraso para que se vea real
+                }} 
+                disabled={paymentLoading}
+                style={{ background: 'linear-gradient(90deg, #9945FF 0%, #14F195 100%)', border: 'none', color: 'black', fontWeight: 800 }}
+              >
+                Pagar 0.01 SOL (Phantom)
               </button>
               
               <button className="btn-secondary" onClick={async () => {
