@@ -49,7 +49,7 @@ def _safe_text(response: Any) -> str:
 async def answer_question(
     question: str,
     chunks: list[dict[str, Any]],
-    model_name: str = "gemini-1.5-flash-latest",
+    model_name: str = "models/gemini-2.0-flash",
     allow_agent_buy: bool = True,
 ) -> str:
     """
@@ -70,18 +70,10 @@ async def answer_question(
     )
 
     models_to_try = [
-        model_name,
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-pro",
-        "gemini-1.0-pro",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro-latest",
-        "gemini-1.0-pro-latest",
-        "gemini-1.5-flash-001",
-        "gemini-1.5-flash-002",
-        "gemini-1.5-pro-001",
-        "gemini-1.5-pro-002"
+        "models/gemini-2.0-flash",
+        "models/gemini-flash-latest",
+        "models/gemini-pro-latest",
+        "gemini-2.0-flash"
     ]
     answer = "Based on cross-referencing multiple verified sources, the fundamental framework relies on adaptive neural processing and robust cryptographic consensus. This ensures data integrity while maximizing throughput across distributed networks. Furthermore, the integration of specialized modules significantly reduces latency in real-time processing tasks."
     model = None
@@ -139,7 +131,7 @@ async def answer_question(
 async def answer_question_with_x402_skill(
     question: str,
     chunks: list[dict[str, Any]],
-    model_name: str = "gemini-1.5-flash",
+    model_name: str = "models/gemini-2.0-flash",
 ) -> str:
     """
     Agentic Q&A with the x402 skill registered as a Gemini function-calling tool.
