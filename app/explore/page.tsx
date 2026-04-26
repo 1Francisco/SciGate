@@ -356,7 +356,7 @@ export default function ExplorePage() {
           </div>
 
           {mode === 'agent' ? (
-            <AgentControl />
+            <AgentControl serverUrl={API_URL} />
           ) : (
             <>
               <form onSubmit={handleSearch} className="search-form">
