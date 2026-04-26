@@ -352,174 +352,176 @@ export default function ExplorePage() {
             </>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 100 }}>
-            {results.map((paper, i) => {
-              const isSelected = getPaperId(selectedPaper) === getPaperId(paper);
-              return (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                  <div
-                    className="card result-paper-item"
-                    style={{ 
-                      cursor: 'pointer', 
-                      borderColor: isSelected ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.05)',
-                      padding: '24px',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      transform: isSelected ? 'scale(1.01)' : 'scale(1)',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.03)' : 'rgba(255,255,255,0.02)',
-                      boxShadow: isSelected ? '0 12px 24px rgba(0,0,0,0.2)' : 'none',
-                      borderRadius: isSelected ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)'
-                    }}
-                    onClick={() => { 
-                      if (isSelected) {
-                        setSelectedPaper(null);
-                      } else {
-                        setSelectedPaper(paper); 
-                        setAnswer(''); 
-                        setQuestion(''); 
-                      }
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                      <div>
-                        <span className="badge badge-verified" style={{ marginBottom: 8, display: 'inline-block' }}>✓ World ID Verified</span>
-                        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                          {paper.title || `Scientific Document ${getPaperId(paper).slice(0,6)}`}
-                        </h2>
+          {mode === 'human' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 100 }}>
+              {results.map((paper, i) => {
+                const isSelected = getPaperId(selectedPaper) === getPaperId(paper);
+                return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <div
+                      className="card result-paper-item"
+                      style={{ 
+                        cursor: 'pointer', 
+                        borderColor: isSelected ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.05)',
+                        padding: '24px',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: isSelected ? 'scale(1.01)' : 'scale(1)',
+                        background: isSelected ? 'rgba(99, 102, 241, 0.03)' : 'rgba(255,255,255,0.02)',
+                        boxShadow: isSelected ? '0 12px 24px rgba(0,0,0,0.2)' : 'none',
+                        borderRadius: isSelected ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)'
+                      }}
+                      onClick={() => { 
+                        if (isSelected) {
+                          setSelectedPaper(null);
+                        } else {
+                          setSelectedPaper(paper); 
+                          setAnswer(''); 
+                          setQuestion(''); 
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div>
+                          <span className="badge badge-verified" style={{ marginBottom: 8, display: 'inline-block' }}>✓ World ID Verified</span>
+                          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                            {paper.title || `Scientific Document ${getPaperId(paper).slice(0,6)}`}
+                          </h2>
+                        </div>
+                        <span style={{ color: 'var(--accent-emerald)', fontSize: 14, fontWeight: 700 }}>$0.01/query</span>
                       </div>
-                      <span style={{ color: 'var(--accent-emerald)', fontSize: 14, fontWeight: 700 }}>$0.01/query</span>
-                    </div>
 
-                    <div style={{ 
-                      background: 'white', color: '#1a1a1a', padding: '24px', borderRadius: '4px', 
-                      boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)', fontFamily: '"Times New Roman", serif',
-                      textAlign: 'justify', lineHeight: '1.5', fontSize: 13, marginBottom: 16,
-                      border: '1px solid #ddd', maxHeight: '180px', overflow: 'hidden', position: 'relative'
-                    }}>
-                      <div style={{ fontWeight: 700, borderBottom: '1px solid #1a1a1a', marginBottom: 8, fontSize: 11, textAlign: 'center' }}>
-                        PREVIEW REPLICA
-                      </div>
-                      {paper.snippet || 'Real abstract content not found.'}
                       <div style={{ 
-                        position: 'absolute', bottom: 0, left: 0, right: 0, height: '40px', 
-                        background: 'linear-gradient(to top, white, transparent)' 
-                      }}></div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                        <button 
-                          className="btn-secondary" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const url = `${window.location.origin}/pay/${getPaperId(paper)}`;
-                            navigator.clipboard.writeText(url);
-                            alert('¡Link de pago copiado al portapapeles!');
-                          }}
-                          style={{ padding: '6px 12px', fontSize: 11, flex: 1 }}
-                        >
-                          🔗 Copiar PayLink
-                        </button>
-                        <button 
-                          className="btn-primary" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPaper(isSelected ? null : paper);
-                          }}
-                          style={{ padding: '6px 12px', fontSize: 11, flex: 1, background: isSelected ? 'var(--text-muted)' : 'var(--accent-indigo)' }}
-                        >
-                          {isSelected ? 'Cerrar' : 'Preguntar IA'}
-                        </button>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'monospace' }}>
-                        Hash: {getPaperId(paper).slice(0, 16)}...
-                      </span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Verified Paper • World Chain</span>
-                    </div>
-                  </div>
-
-                  {/* INLINE AI INTERFACE (Only visible for selected paper) */}
-                  {isSelected && (
-                    <div className="card" style={{ 
-                      borderTop: 'none', 
-                      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
-                      background: 'rgba(99, 102, 241, 0.05)',
-                      borderColor: 'var(--accent-indigo)',
-                      padding: '24px',
-                      animation: 'slideDown 0.3s ease',
-                      position: 'relative'
-                    }}>
-                      {/* Environment Badge */}
-                      <div style={{ 
-                        position: 'absolute', top: 10, right: 10, fontSize: 9, fontWeight: 800, 
-                        background: '#3b82f6',
-                        color: 'white', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase'
+                        background: 'white', color: '#1a1a1a', padding: '24px', borderRadius: '4px', 
+                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)', fontFamily: '"Times New Roman", serif',
+                        textAlign: 'justify', lineHeight: '1.5', fontSize: 13, marginBottom: 16,
+                        border: '1px solid #ddd', maxHeight: '180px', overflow: 'hidden', position: 'relative'
                       }}>
-                        Production (Mainnet)
-                      </div>
-
-                      <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 20 }}>🧬</span> Ask NanoClaw AI
-                          </h3>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <span style={{ fontSize: 10, background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-indigo)', padding: '2px 8px', borderRadius: 4, fontWeight: 700, border: '1px solid rgba(99,102,241,0.2)' }}>X402 PROTOCOL</span>
-                          </div>
+                        <div style={{ fontWeight: 700, borderBottom: '1px solid #1a1a1a', marginBottom: 8, fontSize: 11, textAlign: 'center' }}>
+                          PREVIEW REPLICA
                         </div>
+                        {paper.snippet || 'Real abstract content not found.'}
+                        <div style={{ 
+                          position: 'absolute', bottom: 0, left: 0, right: 0, height: '40px', 
+                          background: 'linear-gradient(to top, white, transparent)' 
+                        }}></div>
                       </div>
 
-                      <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <textarea
-                          className="input"
-                          value={question}
-                          onChange={(e) => { setQuestion(e.target.value); setShowBypassButton(false); }}
-                          placeholder="Escribe tu pregunta para este documento..."
-                          rows={3}
-                          style={{ resize: 'none', background: 'rgba(255,255,255,0.03)', fontSize: 14 }}
-                        />
-                        
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          <button type="submit" className="btn-primary" disabled={answering || !question.trim()} style={{ flex: 1 }}>
-                            {answering ? '🤔 Analizando...' : '🧪 Consultar RAG'}
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                          <button 
+                            className="btn-secondary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const url = `${window.location.origin}/pay/${getPaperId(paper)}`;
+                              navigator.clipboard.writeText(url);
+                              alert('¡Link de pago copiado al portapapeles!');
+                            }}
+                            style={{ padding: '6px 12px', fontSize: 11, flex: 1 }}
+                          >
+                            🔗 Copiar PayLink
                           </button>
+                          <button 
+                            className="btn-primary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPaper(isSelected ? null : paper);
+                            }}
+                            style={{ padding: '6px 12px', fontSize: 11, flex: 1, background: isSelected ? 'var(--text-muted)' : 'var(--accent-indigo)' }}
+                          >
+                            {isSelected ? 'Cerrar' : 'Preguntar IA'}
+                          </button>
+                      </div>
 
-                          {needsPayment && (
-                            <button 
-                              type="button"
-                              className="btn-primary" 
-                              onClick={() => setIsPaymentModalOpen(true)}
-                              style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white', flex: 1 }}
-                            >
-                              💳 Pagar $0.01
-                            </button>
-                          )}
-                        </div>
-                      </form>
-
-                      {error && !isPaymentModalOpen && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.05)', borderLeft: '3px solid #ef4444', color: '#f87171', fontSize: 13 }}>
-                          {error}
-                        </div>
-                      )}
-
-                      {answer && (
-                        <div style={{
-                          marginTop: 24, padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.2)',
-                          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)'
-                        }}>
-                          <div style={{ fontSize: 11, color: 'var(--accent-indigo)', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            ⚡ AI Analysis Result
-                          </div>
-                          <p style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{answer}</p>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'monospace' }}>
+                          Hash: {getPaperId(paper).slice(0, 16)}...
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Verified Paper • World Chain</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+
+                    {/* INLINE AI INTERFACE (Only visible for selected paper) */}
+                    {isSelected && (
+                      <div className="card" style={{ 
+                        borderTop: 'none', 
+                        borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+                        background: 'rgba(99, 102, 241, 0.05)',
+                        borderColor: 'var(--accent-indigo)',
+                        padding: '24px',
+                        animation: 'slideDown 0.3s ease',
+                        position: 'relative'
+                      }}>
+                        {/* Environment Badge */}
+                        <div style={{ 
+                          position: 'absolute', top: 10, right: 10, fontSize: 9, fontWeight: 800, 
+                          background: '#3b82f6',
+                          color: 'white', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase'
+                        }}>
+                          Production (Mainnet)
+                        </div>
+
+                        <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 20 }}>🧬</span> Ask NanoClaw AI
+                            </h3>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-indigo)', padding: '2px 8px', borderRadius: 4, fontWeight: 700, border: '1px solid rgba(99,102,241,0.2)' }}>X402 PROTOCOL</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleQuery} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          <textarea
+                            className="input"
+                            value={question}
+                            onChange={(e) => { setQuestion(e.target.value); setShowBypassButton(false); }}
+                            placeholder="Escribe tu pregunta para este documento..."
+                            rows={3}
+                            style={{ resize: 'none', background: 'rgba(255,255,255,0.03)', fontSize: 14 }}
+                          />
+                          
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <button type="submit" className="btn-primary" disabled={answering || !question.trim()} style={{ flex: 1 }}>
+                              {answering ? '🤔 Analizando...' : '🧪 Consultar RAG'}
+                            </button>
+
+                            {needsPayment && (
+                              <button 
+                                type="button"
+                                className="btn-primary" 
+                                onClick={() => setIsPaymentModalOpen(true)}
+                                style={{ background: 'var(--accent-emerald)', border: 'none', color: 'white', flex: 1 }}
+                              >
+                                💳 Pagar $0.01
+                              </button>
+                            )}
+                          </div>
+                        </form>
+
+                        {error && !isPaymentModalOpen && (
+                          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.05)', borderLeft: '3px solid #ef4444', color: '#f87171', fontSize: 13 }}>
+                            {error}
+                          </div>
+                        )}
+
+                        {answer && (
+                          <div style={{
+                            marginTop: 24, padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.2)',
+                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)'
+                          }}>
+                            <div style={{ fontSize: 11, color: 'var(--accent-indigo)', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              ⚡ AI Analysis Result
+                            </div>
+                            <p style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{answer}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </main>
       
