@@ -241,6 +241,7 @@ async def answer_question_with_x402_skill(
     return _safe_text(response) or "Unable to generate answer."
 # --- TELEGRAM BOT INTEGRATION ---
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -259,27 +260,36 @@ async def telegram_handle_message(update: Update, context: ContextTypes.DEFAULT_
     
     try:
         # Usamos la misma lógica de RAG que la web
-        # Para el bot, usamos una búsqueda simplificada o el agente autónomo
-        answer = await answer_question(user_text, []) # Búsqueda sin fragmentos previos
+        answer = await answer_question(user_text, []) 
         await update.message.reply_text(answer)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
-def run_telegram_bot():
+async def start_bot_async():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         print("[Telegram] Skipping bot start: TELEGRAM_BOT_TOKEN not found in .env")
         return
 
-    print(f"[Telegram] Starting bot...")
+    print(f"[Telegram] Starting bot in async mode...")
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", telegram_start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handle_message))
     
-    # Nota: run_polling es bloqueante. Para correr junto con el servidor web
-    # se suele usar un thread o una tarea asíncrona.
-    import threading
-    threading.Thread(target=application.run_polling, daemon=True).start()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(drop_pending_updates=True)
 
-# Intentar arrancar el bot si el token existe
+# Iniciamos el bot como una tarea de fondo de asyncio
+def run_telegram_bot():
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(start_bot_async())
+        else:
+            print("[Telegram] Event loop not running yet, check main.py startup")
+    except Exception as e:
+        print(f"[Telegram] Failed to schedule bot: {e}")
+
+# Intentar arrancar el bot
 run_telegram_bot()
