@@ -167,7 +167,7 @@ export default function ExplorePage() {
         (MiniKit as any).subscribe('pay', handlePayResponse);
 
         // CAMBIO: Bypass de tipos para llamada directa
-        (MiniKit as any).pay({
+        (MiniKit as any).commands.pay({
           reference: paymentReference,
           to: RECIPIENT,
           tokens: [{ symbol: 'USDC' as any, token_amount: '10000' }], // 10000 = 0.01 USDC (6 decimales)
@@ -176,7 +176,7 @@ export default function ExplorePage() {
         setTimeout(() => { 
           (MiniKit as any).unsubscribe('pay', handlePayResponse);
           reject(new Error('timeout')); 
-        }, 120000);
+        }, 3000);
       });
 
       setPaymentStatus('Validando pago...');

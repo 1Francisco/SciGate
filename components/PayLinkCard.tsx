@@ -123,7 +123,7 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
         (MiniKit as any).subscribe('send_transaction', handleTxResponse);
 
         // CAMBIO: Bypass de tipos para llamada directa
-        (MiniKit as any).sendTransaction({
+        (MiniKit as any).commands.sendTransaction({
           transaction: [{
             address: USDC_ADDRESS,
             abi: USDC_ABI as any,
@@ -134,7 +134,7 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
         setTimeout(() => { 
           (MiniKit as any).unsubscribe('send_transaction', handleTxResponse);
           reject(new Error('timeout')); 
-        }, 120000);
+        }, 3000);
       });
 
       const txId = (txResponse as any).transactionId || (txResponse as any).transactionHash || (txResponse as any).data?.transactionId;
