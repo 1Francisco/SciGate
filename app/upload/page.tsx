@@ -55,10 +55,13 @@ export default function UploadPage() {
         };
         (MiniKit as any).subscribe('verify', handleVerifyResponse);
 
-        (MiniKit as any).verify({
-          action: WORLD_ACTION_ID,
-          signal: '',
-          verification_level: 'orb', // Exigimos Orb verification
+        // Usamos walletAuth en lugar de verify porque está 100% garantizado que existe en v1.2.0
+        // y levantará el modal visual en la World App para que puedas grabarlo.
+        (MiniKit as any).walletAuth({
+          nonce: 'scigate-demo-verify',
+          statement: 'Verify your identity as a researcher for SciGate',
+          expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
+          notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000)
         });
         
         // Timeout de seguridad de 60 segundos
