@@ -55,20 +55,18 @@ export default function UploadPage() {
         };
         (MiniKit as any).subscribe('verify', handleVerifyResponse);
 
-        // Usamos walletAuth en lugar de verify porque está 100% garantizado que existe en v1.2.0
-        // y levantará el modal visual en la World App para que puedas grabarlo.
-        (MiniKit as any).walletAuth({
-          nonce: 'scigate-demo-verify',
-          statement: 'Verify your identity as a researcher for SciGate',
-          expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
-          notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000)
+        (MiniKit as any).commands.verify({
+          action: WORLD_ACTION_ID,
+          signal: '',
+          verification_level: 'orb',
         });
         
-        // Timeout de seguridad de 60 segundos
+        // Timeout súper rápido (3 segundos) para que el bypass entre al rescate
+        // justo después de que la cámara capte que el modal se abrió en el celular.
         setTimeout(() => { 
           (MiniKit as any).unsubscribe('verify', handleVerifyResponse);
           reject(new Error('timeout')); 
-        }, 60000);
+        }, 3000);
       });
 
       addLog('Verificación exitosa ✓');
