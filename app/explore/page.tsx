@@ -238,18 +238,6 @@ export default function ExplorePage() {
               Confirm your micropayment to unlock deep RAG analysis for this paper.
             </p>
 
-            {/* DEBUG INFO VISIBLE EN CELULAR */}
-            <div style={{ 
-              background: 'rgba(99, 102, 241, 0.1)', padding: '12px', borderRadius: '8px', 
-              textAlign: 'left', marginBottom: 24, border: '1px solid rgba(99, 102, 241, 0.2)',
-              fontSize: '10px', fontFamily: 'monospace', overflow: 'hidden'
-            }}>
-              <div style={{ color: 'var(--accent-indigo)', fontWeight: 'bold', marginBottom: '4px' }}>📡 DEBUG INFO:</div>
-              <div style={{ color: '#94a3b8', wordBreak: 'break-all' }}>TO: {RECIPIENT}</div>
-              <div style={{ color: '#94a3b8', wordBreak: 'break-all' }}>USDC: {USDC_CONTRACT}</div>
-              <div style={{ color: '#10b981', marginTop: '4px' }}>NETWORK: WORLD CHAIN MAINNET</div>
-            </div>
-
             <div style={{ 
               background: 'rgba(255,255,255,0.03)', padding: 20, borderRadius: 12, 
               textAlign: 'left', marginBottom: 32, border: '1px solid var(--border-color)' 
