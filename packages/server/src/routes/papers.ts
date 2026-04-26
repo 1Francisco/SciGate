@@ -18,6 +18,13 @@ papers.get('/search', async (c) => {
   try {
     const { data } = await searchPapers(q);
     results = data.results ?? [];
+    
+    // HACKATHON FIX: Como modificamos Python para devolver un vector de ceros y evitar el Error 500,
+    // Python ahora devuelve 200 OK pero con 0 resultados (porque el vector [0,0,0] no hace match con nada).
+    // Si obtenemos 0 resultados, forzamos el error para activar la búsqueda de respaldo (fallback).
+    if (results.length === 0) {
+      throw new Error("RAG engine returned 0 results (possible zero-vector fallback)");
+    }
   } catch (err: any) {
     console.warn(`[search] RAG engine failed (${err.message}). Using fallback Supabase search...`);
     
