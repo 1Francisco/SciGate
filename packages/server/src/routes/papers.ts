@@ -148,6 +148,14 @@ export async function handleQuery(paperId: string, question: string) {
 
   try {
     const { data, status } = await queryPaper(paperId, question);
+    
+    // HACKATHON FIX: El backend de Python está devolviendo un 404 controlado porque el 
+    // vector vacío no encuentra el paper. Al ser 404, Node.js no lo consideraba un "error grave" 
+    // y no activaba el rescate (fallback). Lo forzamos a fallar aquí para que la IA responda.
+    if (status === 404 || (data as any).detail?.includes('not found')) {
+      throw new Error(`Forcing fallback due to RAG 404: ${(data as any).detail}`);
+    }
+    
     return { data, status };
   } catch (err: any) {
     console.warn(`[handleQuery] RAG engine failed on ${paperId}: ${err.message}. Using fallback answer...`);
