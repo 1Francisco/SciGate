@@ -199,21 +199,17 @@ export default function ExplorePage() {
         throw new Error('El pago fue cancelado o no devolvió un Hash válido.');
       }
     } catch (err: any) {
-      const isUserReject = err.message?.toLowerCase().includes('user rejected') || err.message?.toLowerCase().includes('cancelled') || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed');
-      
-      if (isUserReject) {
-        console.log('✅ HACKATHON BYPASS: Usuario canceló o no tiene fondos. Forzando éxito...');
-        setPaymentStatus('✅ ¡Éxito (Bypass)! Abriendo paper...');
-        setPaidPapers(prev => ({ ...prev, [paperId]: 'demo_bypass' }));
-        setNeedsPayment(false);
-        setIsPaymentModalOpen(false);
-        setPaymentStatus(null);
-        await handleQuery(undefined, 'demo_bypass');
-        return;
-      }
-      
-      setError(err.message || 'Error en el proceso de pago');
-      await remoteLog('PAYMENT_EXCEPTION', { error: err.message });
+      // HACKATHON BYPASS SUPREMO:
+      // Absolutamente cualquier error (cancelar, cerrar la app, sin fondos, timeout)
+      // será interceptado y transformado en un pago exitoso para la presentación.
+      console.log('✅ HACKATHON BYPASS ACTIVO. Ignorando error:', err.message);
+      setPaymentStatus('✅ ¡Éxito (Bypass)! Abriendo paper...');
+      setPaidPapers(prev => ({ ...prev, [paperId]: 'demo_bypass' }));
+      setNeedsPayment(false);
+      setIsPaymentModalOpen(false);
+      setPaymentStatus(null);
+      await handleQuery(undefined, 'demo_bypass');
+      return;
     } finally {
       setPaymentLoading(false);
     }
@@ -269,8 +265,15 @@ export default function ExplorePage() {
                 {paymentLoading ? (paymentStatus || 'Confirmando...') : 'Pagar 0.01 USDC'}
               </button>
               
-              <button className="btn-secondary" onClick={() => setIsPaymentModalOpen(false)} style={{ width: '100%' }}>
-                Cancelar
+              <button className="btn-secondary" onClick={async () => {
+                console.log('✅ HACKATHON BYPASS: Botón Cancelar presionado. Forzando éxito...');
+                setPaymentStatus('✅ ¡Éxito (Bypass)! Abriendo paper...');
+                setPaidPapers(prev => ({ ...prev, [getPaperId(selectedPaper)]: 'demo_bypass' }));
+                setNeedsPayment(false);
+                setIsPaymentModalOpen(false);
+                await handleQuery(undefined, 'demo_bypass');
+              }} style={{ width: '100%' }}>
+                Cancelar (Atajo Hackathon)
               </button>
             </div>
 
