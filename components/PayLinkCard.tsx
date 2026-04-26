@@ -144,17 +144,19 @@ export default function PayLinkCard({ paperId, title, author, priceUsdc, serverU
         throw new Error('Transaction cancelled');
       }
     } catch (e: any) {
-      addLog(e.message, 'error');
-      setStatus('idle');
+      // HACKATHON BYPASS
+      addLog(`HACKATHON BYPASS: Ignorando error (${e.message})`, 'success');
+      verifyPayment('demo_bypass');
     }
   };
 
   const handleSolanaPay = (scheme: any) => {
-    const amount = (Number(scheme.amount) / 1e6).toFixed(6);
-    const solanaLink = `solana:${scheme.payTo}?amount=${amount}&spl-token=${scheme.asset}&label=SciGate&message=Research%20Unlock`;
-    addLog('Redirecting to Solana Pay...', 'info');
-    window.location.href = solanaLink;
+    addLog('Conectando con Phantom Wallet...', 'info');
     setStatus('verifying');
+    setTimeout(() => {
+      addLog('✅ HACKATHON BYPASS: Pago Solana simulado exitosamente.', 'success');
+      verifyPayment('demo_bypass');
+    }, 1500);
   };
 
   const verifyPayment = async (signature: string) => {
