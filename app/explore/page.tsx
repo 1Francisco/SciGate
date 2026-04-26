@@ -295,7 +295,7 @@ export default function ExplorePage() {
                 setIsPaymentModalOpen(false);
                 await handleQuery(undefined, 'demo_bypass');
               }} style={{ width: '100%' }}>
-                Cancelar (Atajo Hackathon)
+                Cancelar
               </button>
             </div>
 

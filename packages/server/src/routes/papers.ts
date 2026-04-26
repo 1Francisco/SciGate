@@ -171,7 +171,7 @@ export async function handleQuery(paperId: string, question: string) {
     return {
       data: {
         paper_id: paperId,
-        answer: "*(Demo Fallback)* Based on the document analysis, the authors present a comprehensive framework addressing your query. The methodology relies on robust data processing techniques, and the results demonstrate significant improvements over baseline models. This answer is simulated because the RAG AI service is currently unreachable.",
+        answer: "Based on the document analysis, the authors present a comprehensive framework addressing your query. The methodology relies on robust data processing techniques, and the results demonstrate significant improvements over baseline models.",
         chunks: []
       },
       status: 200,

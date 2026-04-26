@@ -175,10 +175,7 @@ export default function UploadPage() {
               {isVerifying ? '⏳ Verificando...' : 'Verificar con World ID →'}
             </button>
 
-            <div style={{ marginTop: 24, textAlign: 'left', fontSize: 12, background: '#111', padding: 12, borderRadius: 8, border: '1px solid #333' }}>
-              <div style={{ color: '#666', marginBottom: 4 }}>LOGS:</div>
-              {debugLogs.map((log, i) => <div key={i} style={{ color: i === 0 ? 'var(--accent-emerald)' : '#888' }}>&gt; {log}</div>)}
-            </div>
+
           </div>
         )}
 
