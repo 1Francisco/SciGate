@@ -69,9 +69,20 @@ async def answer_question(
         f"Paper excerpts:\n{context}"
     )
 
-    model = genai.GenerativeModel(model_name)
-    response = await model.generate_content_async(prompt)
-    answer = _safe_text(response) or "Unable to generate answer."
+    models_to_try = [model_name, "gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"]
+    answer = "Error interno: Todos los modelos de IA fallaron."
+    model = None
+    
+    for m in models_to_try:
+        try:
+            model = genai.GenerativeModel(m)
+            response = await model.generate_content_async(prompt)
+            answer = _safe_text(response) or "Unable to generate answer."
+            print(f"✅ [qa] Generación exitosa usando el modelo: {m}")
+            break
+        except Exception as e:
+            print(f"⚠️ [qa] Falló el modelo {m}: {e}")
+            continue
 
     if "NEED_GLOBAL_SEARCH:" not in answer or not allow_agent_buy:
         return answer
@@ -142,17 +153,27 @@ async def answer_question_with_x402_skill(
 
     prompt = f"Question: {question}\n\nPaper excerpts:\n{context}"
 
-    model = genai.GenerativeModel(
-        model_name,
-        tools=[skill.get_tool_definition()],
-        system_instruction=_X402_TOOL_SYSTEM_PROMPT,
-    )
-    chat = model.start_chat()
-
-    try:
-        response = await chat.send_message_async(prompt)
-    except Exception as exc:
-        print(f"[qa] initial send_message failed: {exc}")
+    models_to_try = [model_name, "gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"]
+    response = None
+    chat = None
+    
+    for m in models_to_try:
+        try:
+            model = genai.GenerativeModel(
+                m,
+                tools=[skill.get_tool_definition()],
+                system_instruction=_X402_TOOL_SYSTEM_PROMPT,
+            )
+            chat = model.start_chat()
+            response = await chat.send_message_async(prompt)
+            print(f"✅ [qa] Agente iniciado exitosamente usando el modelo: {m}")
+            break
+        except Exception as exc:
+            print(f"⚠️ [qa] Agente falló con el modelo {m}: {exc}")
+            continue
+            
+    if not response or not chat:
+        print("[qa] Todos los modelos agenticos fallaron, cayendo a answer_question básico.")
         return await answer_question(question, chunks, model_name, allow_agent_buy=True)
 
     for turn in range(_MAX_TOOL_TURNS):
