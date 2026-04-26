@@ -170,10 +170,7 @@ export default function ExplorePage() {
         (MiniKit as any).pay({
           reference: paymentReference,
           to: RECIPIENT,
-          tokens: [{ 
-            symbol: 'USDC' as any, 
-            token_amount: '0.01' 
-          }],
+          tokens: [{ symbol: 'USDC' as any, token_amount: '10000' }], // 10000 = 0.01 USDC (6 decimales)
           description: `Unlock Paper: ${selectedPaper.title || paperId}`,
         });
         setTimeout(() => { 
