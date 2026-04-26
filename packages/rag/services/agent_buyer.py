@@ -21,11 +21,12 @@ async def search_and_buy_context(query: str, limit: int = 3) -> List[Dict[str, A
 
     print(f"🕵️  Agent Buyer: searching catalog for '{query}'")
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+    # Usamos un timeout más largo (60s) por si Render está durmiendo
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
         try:
-            # Corregimos la ruta de /papers/search a /search (que es la que tiene el RAG)
+            # La ruta correcta en el backend de Render es /papers/search
             search_resp = await client.get(
-                f"{SCIGATE_API_URL}/search", params={"q": query}
+                f"{SCIGATE_API_URL}/papers/search", params={"q": query}
             )
         except Exception as e:
             print(f"[agent_buyer] search request failed: {e}")
