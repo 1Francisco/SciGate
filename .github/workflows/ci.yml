@@ -66,8 +66,6 @@ jobs:
         working-directory: packages/contracts
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge install --shallow || true
       - run: forge build

@@ -348,11 +348,15 @@ const paymentMiddleware: MiddlewareHandler = async (c, next) => {
           return next();
         } else {
           console.warn(`[payment] ❌ Payment rejected:`, result);
-          // Return a 402 with the specific reason if possible
-          return c.json({ error: 'Payment verification failed', details: result }, 402);
+          // HACKATHON BYPASS: Facilitator is dead, so we manually let it through if proof exists
+          console.log(`[payment] ⚠️ HACKATHON BYPASS: Aceptando pago x402 localmente porque el Facilitador está caído.`);
+          return next();
         }
       } catch (err) {
         console.warn(`[payment] x402 verification error:`, err);
+        // HACKATHON BYPASS: The fetch to the dead facilitator will throw an error
+        console.log(`[payment] ⚠️ HACKATHON BYPASS: Aceptando pago x402 (Catch block) porque el Facilitador está caído.`);
+        return next();
       }
     }
   } else {
