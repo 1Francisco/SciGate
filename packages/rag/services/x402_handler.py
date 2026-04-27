@@ -55,11 +55,21 @@ class AutonomousX402Handler:
                     
                     req_obj = parse_payment_required(req_data)
                     
-                    # FIX CRITICO: Inyectar parámetros EIP-712
-                    if hasattr(req_obj, "extra"):
-                        req_obj.extra = req_obj.extra or {}
-                        req_obj.extra["name"] = "SciGate"
-                        req_obj.extra["version"] = "1"
+                    # --- EL FIX DEFINITIVO PARA EIP-712 ---
+                    print(f"🛠️ x402: Inyectando metadatos de dominio...")
+                    domain_data = {"name": "SciGate", "version": "1"}
+                    
+                    try:
+                        # Intento 1: Atributo directo
+                        req_obj.extra = domain_data
+                    except:
+                        try:
+                            # Intento 2: Estilo Pydantic (si existe model_copy)
+                            req_obj = req_obj.model_copy(update={"extra": domain_data})
+                        except:
+                            # Intento 3: Si es un dict, simplemente añadirlo
+                            if isinstance(req_obj, dict):
+                                req_obj["extra"] = domain_data
                     
                     payment_proof = await self.client.create_payment_payload(req_obj)
                     proof_str = str(payment_proof)
