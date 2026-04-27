@@ -201,26 +201,18 @@ async def answer_question_with_x402_skill(
         except Exception as exc:
             print(f"⚠️ [qa] Agente falló con el modelo {m}: {exc}")
             if "429" in str(exc) or "quota" in str(exc).lower():
-                # Extract wait time if possible, else 10s
-                wait_time = 10
-                import re
-                match = re.search(r"retry in (\d+\.?\d*)s", str(exc))
-                if match:
-                    wait_time = float(match.group(1)) + 1
-                
-                print(f"[qa] 429 Quota hit, waiting {wait_time} seconds before trying next model...")
-                await asyncio.sleep(wait_time)
+                print(f"[qa] 429 Quota hit, waiting 1s...")
+                await asyncio.sleep(1)
             continue
             
     if not response or not chat:
-        print("[qa] Todos los modelos fallaron. Intentando un último esfuerzo con gemini-flash-latest después de una pausa...")
-        await asyncio.sleep(30)
+        print("[qa] Todos los modelos fallaron por cuota. Intentando un último esfuerzo rápido...")
         try:
              model = genai.GenerativeModel("models/gemini-flash-latest", tools=[skill.get_tool_definition()])
              chat = model.start_chat()
              response = await chat.send_message_async(prompt)
-        except Exception as final_exc:
-             return f"❌ Error de cuota de IA (429). Por favor espera un minuto e intenta de nuevo. Detalles: {str(final_exc)}"
+        except Exception:
+             return "❌ Error de cuota de IA (429). Por favor intenta de nuevo en unos segundos."
 
     for turn in range(_MAX_TOOL_TURNS):
         candidates = response.candidates or []
