@@ -73,8 +73,15 @@ class AutonomousX402Handler:
                         req_data = payment_req # Si no es JSON, usar el texto original
                     
                     # Parsear y generar el pago
+                    # Parsear y generar el pago
                     req_obj = parse_payment_required(req_data)
-                    payment_proof = await self.client.create_payment_payload(req_obj)
+                    
+                    # Generar el payload de pago usando el cliente x402
+                    # Añadimos extra con name y version para satisfacer el requisito de EIP-712
+                    payment_proof = await self.client.create_payment_payload(
+                        req_obj, 
+                        extra={"name": "SciGate", "version": "1"}
+                    )
                     
                     # Convertir el comprobante a string (algunas versiones devuelven un objeto)
                     proof_str = str(payment_proof)
