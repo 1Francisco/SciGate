@@ -276,7 +276,7 @@ class X402Skill:
             body=body_out,
             paid=paid,
             network=X402_PREFERRED_NETWORK if paid else None,
-            error=None if ok else f"HTTP {status}",
+            error=None if ok else (f"HTTP {status}: Billetera sin fondos o pago rechazado" if status == 402 else f"HTTP {status}"),
             call_id=call_id,
             elapsed_ms=elapsed,
         )

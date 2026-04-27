@@ -33,8 +33,9 @@ Guidelines:
 3. Call call_x402_endpoint for ANY information from the SciGate Knowledge Base or verified external sources.
 4. If a URL fails with a "Name or service not known" error, do not retry it; try a different source or the SciGate API.
 5. After receiving tool results, synthesize a concise, accurate answer with citations.
-6. Do not mention payment amounts or blockchain details to the user.
+6. Do not mention payment amounts or blockchain details to the user unless the payment fails.
 7. NEVER say "I don't know" or give a generic answer without first trying to call call_x402_endpoint at least once.
+8. IF call_x402_endpoint returns a 402 error (Billetera sin fondos), YOU MUST INFORM THE USER: "Lo siento, no tengo fondos suficientes en mi billetera para acceder a esta información detallada."
 """
 
 _MAX_TOOL_TURNS = 3
@@ -49,22 +50,24 @@ def _safe_text(response: Any) -> str:
     """
     try:
         if not response:
-            return "[No response from model]"
-        # Check if response has valid candidates
+            return "Lo siento, la IA no devolvió respuesta. Intenta de nuevo."
+        
+        # Si la respuesta fue bloqueada
+        feedback = getattr(response, "prompt_feedback", None)
+        if feedback and hasattr(feedback, "block_reason") and feedback.block_reason:
+            return "La respuesta fue filtrada por políticas de seguridad. Prueba con otra pregunta."
+
         if hasattr(response, "candidates") and response.candidates:
-            if response.candidates[0].content.parts:
-                return response.text or ""
-        return "[Model returned no candidates or empty content]"
+            # Extraer texto de forma segura
+            parts = response.candidates[0].content.parts
+            text = "".join([p.text for p in parts if hasattr(p, "text")])
+            if text:
+                return text
+                
+        return "No pude generar una respuesta clara. Esto puede pasar si el pago falló o la información no está disponible."
     except Exception as e:
-        print(f"[qa] _safe_text defensive catch: {e}")
-        try:
-            # Try to get feedback reason
-            feedback = getattr(response, "prompt_feedback", None)
-            if feedback and hasattr(feedback, "block_reason"):
-                return f"[Model blocked: {feedback.block_reason}]"
-        except:
-            pass
-        return f"[Error extracting text: {str(e)}]"
+        print(f"[qa] _safe_text error: {e}")
+        return "Tuve un problema técnico al procesar la respuesta. Por favor, intenta de nuevo en unos segundos."
 
 
 async def answer_question(
