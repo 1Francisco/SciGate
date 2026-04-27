@@ -241,14 +241,21 @@ async def telegram_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def telegram_handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
+    if not user_text:
+        return
+        
     await update.message.reply_chat_action("typing")
+    print(f"🤖 [Telegram] Processing question from {update.effective_user.first_name}: {user_text[:50]}...")
     
     try:
-        # Usamos la misma lógica de RAG que la web
-        answer = await answer_question(user_text, []) 
-        await update.message.reply_text(answer)
+        # Usamos el modo AGENTE para que pueda buscar y comprar contexto automáticamente
+        answer = await answer_question_with_x402_skill(user_text, []) 
+        
+        # Limpieza básica para Markdown de Telegram
+        await update.message.reply_text(answer, parse_mode="Markdown")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        print(f"❌ [Telegram] Error: {e}")
+        await update.message.reply_text(f"❌ *Error*: {str(e)}", parse_mode="Markdown")
 
 async def start_bot_async():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -256,8 +263,10 @@ async def start_bot_async():
         print("[Telegram] Skipping bot start: TELEGRAM_BOT_TOKEN not found in .env")
         return
 
-    print(f"[Telegram] Starting bot in async mode...")
+    print(f"[Telegram] Starting bot in FULL AGENTIC mode...")
     application = Application.builder().token(token).build()
+    
+    # Handlers
     application.add_handler(CommandHandler("start", telegram_start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handle_message))
     

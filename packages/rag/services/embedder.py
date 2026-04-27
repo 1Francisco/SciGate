@@ -29,10 +29,9 @@ def _embed(texts: List[str]) -> List[List[float]]:
     """
     # Probamos nombres directos que suelen ser más estables en v1beta
     model_choices = [
+        "models/gemini-embedding-001",
         "models/text-embedding-004",
-        "text-embedding-004",
         "models/embedding-001",
-        "embedding-001"
     ]
 
     last_err: Optional[Exception] = None

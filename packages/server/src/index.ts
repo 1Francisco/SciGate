@@ -313,25 +313,43 @@ const paymentMiddleware: MiddlewareHandler = async (c, next) => {
     'anonymous';
 
   // ── 1. Demo bypass (gated by DEMO_MODE env) ──────────────────
-  const proof = c.req.header('x-payment-proof') ?? c.req.header('PAYMENT-SIGNATURE') ?? '';
-  if (DEMO_MODE && (proof === 'demo_bypass' || proof === 'bypass')) {
-    console.log(`[payment][demo] bypass accepted for ${path}`);
-    return next();
+  const authHeader = c.req.header('Authorization') ?? '';
+  const x402Token = authHeader.toLowerCase().startsWith('x402 ') ? authHeader.slice(5) : '';
+  const proof = c.req.header('x-payment-proof') ?? c.req.header('PAYMENT-SIGNATURE') ?? x402Token;
+
+  if (x402Token && x402Token.length > 500) {
+     console.log(`[payment] potential x402 token detected for ${path}`);
   }
 
-  // ── 2. Verified on-chain payment ─────────────────────────────
-  if (proof && proof.startsWith('0x') && proof.length === 66 && paperId) {
-    const { payTo, amount } = await resolvePaymentTarget(paperId, kind);
-    const result = await verifyUsdcPayment(proof as `0x${string}`, payTo, amount);
-    if (result.ok) {
-      console.log(`[payment] verified ${proof.slice(0, 10)}… → ${payTo.slice(0, 8)}…`);
-      // Fire-and-forget on-chain record
-      recordAccess(paperId as `0x${string}`, kind, amount).catch((err) =>
-        console.warn('[recordAccess] background error:', err)
-      );
-      return next();
+  // ── 2. Verified on-chain payment or x402 token ─────────────────────────────
+  if (proof && paperId) {
+    // Case A: Transaction Hash (66 chars)
+    if (proof.startsWith('0x') && proof.length === 66) {
+      const { payTo, amount } = await resolvePaymentTarget(paperId, kind);
+      const result = await verifyUsdcPayment(proof as `0x${string}`, payTo, amount);
+      if (result.ok) {
+        console.log(`[payment] verified ${proof.slice(0, 10)}… → ${payTo.slice(0, 8)}…`);
+        recordAccess(paperId as `0x${string}`, kind, amount).catch((err) =>
+          console.warn('[recordAccess] background error:', err)
+        );
+        return next();
+      }
+      console.warn(`[payment] verification rejected: ${result.reason}`);
+    } 
+    // Case B: x402 Token (long string, not a hash)
+    else if (proof.length > 66) {
+      try {
+        const { payTo, amount } = await resolvePaymentTarget(paperId, kind);
+        const requirements = build402(c.req.url, payTo, amount);
+        const result = await (resourceServer as any).verifyPayment(proof, requirements.accepts);
+        if (result.ok) {
+          console.log(`[payment] x402 token verified`);
+          return next();
+        }
+      } catch (err) {
+        console.warn(`[payment] x402 token verification error:`, err);
+      }
     }
-    console.warn(`[payment] verification rejected: ${result.reason}`);
   }
 
   // ── 3. Free-trial (persisted) ────────────────────────────────

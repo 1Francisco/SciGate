@@ -111,7 +111,11 @@ class AutonomousX402Handler:
                     new_headers = kwargs["headers"].copy()
                     new_headers["Authorization"] = f"x402 {proof_str}"
                     
-                    print(f"🚀 x402: Re-intentando con comprobante...")
+                    # Compatibilidad con el middleware manual de SciGate
+                    new_headers["x-payment-proof"] = proof_str
+                    new_headers["PAYMENT-SIGNATURE"] = proof_str
+                    
+                    print(f"🚀 x402: Re-intentando con comprobante (headers duales)...")
                     return await client.request(method, url, headers=new_headers, json=kwargs.get("json"), params=kwargs.get("params"))
                 except Exception as e:
                     print(f"❌ x402: Error al generar pago: {e}")
