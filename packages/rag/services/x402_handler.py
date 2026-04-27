@@ -24,7 +24,12 @@ class AutonomousX402Handler:
         if evm_key:
             try:
                 account = Account.from_key(evm_key)
-                self.client.register("eip155:480", ExactEvmScheme(signer=EthAccountSigner(account)))
+                # Añadimos los parámetros de dominio EIP-712 aquí
+                scheme = ExactEvmScheme(
+                    signer=EthAccountSigner(account),
+                    extra={"name": "SciGate", "version": "1"}
+                )
+                self.client.register("eip155:480", scheme)
                 print(f"✅ World Chain ID: {account.address}")
             except Exception as e:
                 print(f"❌ Error en Llave EVM: {str(e)}")
@@ -77,11 +82,7 @@ class AutonomousX402Handler:
                     req_obj = parse_payment_required(req_data)
                     
                     # Generar el payload de pago usando el cliente x402
-                    # Usamos extensions para pasar name y version para EIP-712
-                    payment_proof = await self.client.create_payment_payload(
-                        req_obj, 
-                        extensions={"name": "SciGate", "version": "1"}
-                    )
+                    payment_proof = await self.client.create_payment_payload(req_obj)
                     
                     # Convertir el comprobante a string (algunas versiones devuelven un objeto)
                     proof_str = str(payment_proof)
