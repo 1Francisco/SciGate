@@ -2,7 +2,7 @@ import os
 import asyncio
 import httpx
 from eth_account import Account
-from x402 import x402Client
+from x402 import x402Client, parse_payment_request_header
 from x402.mechanisms.evm.exact import ExactEvmScheme
 from x402.mechanisms.svm.exact import ExactSvmScheme
 from x402.mechanisms.evm.signers import EthAccountSigner
@@ -60,8 +60,11 @@ class AutonomousX402Handler:
                 
                 print(f"🤝 x402: Negociando pago para {url}...")
                 try:
+                    # Parsear la cabecera en un objeto que x402 entienda
+                    req_obj = parse_payment_request_header(payment_req)
+                    
                     # Generar el payload de pago usando el cliente x402
-                    payment_proof = await self.client.create_payment_payload(payment_req)
+                    payment_proof = await self.client.create_payment_payload(req_obj)
                     
                     # 3. Re-intentar con el header de Autorización x402
                     new_kwargs = kwargs.copy()
