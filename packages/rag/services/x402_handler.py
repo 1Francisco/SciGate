@@ -6,6 +6,27 @@ from x402 import x402Client, parse_payment_required
 from x402.mechanisms.evm.exact import ExactEvmScheme
 from x402.mechanisms.evm.signers import EthAccountSigner
 
+# --- LA OPCIÓN NUCLEAR: MONKEY-PATCHING ---
+# Forzamos a la librería a usar nuestros metadatos sin importar qué
+original_sign = ExactEvmScheme._sign_authorization
+
+def patched_sign(self, authorization, requirements):
+    # Inyectamos a la fuerza antes de llamar a la función original
+    if hasattr(requirements, "extra"):
+        requirements.extra = requirements.extra or {}
+        requirements.extra["name"] = "SciGate"
+        requirements.extra["version"] = "1"
+    elif isinstance(requirements, dict):
+        if "extra" not in requirements: requirements["extra"] = {}
+        requirements["extra"]["name"] = "SciGate"
+        requirements["extra"]["version"] = "1"
+    
+    return original_sign(self, authorization, requirements)
+
+# Aplicar el parche en memoria
+ExactEvmScheme._sign_authorization = patched_sign
+print("☢️ x402: Sistema de firma EIP-712 parcheado con éxito.")
+
 class AutonomousX402Handler:
     def __init__(self):
         print("\n🛰️  SciGate: Inicializando Sistemas de Pago...")
