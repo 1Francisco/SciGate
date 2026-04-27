@@ -24,11 +24,17 @@ class AutonomousX402Handler:
         if evm_key:
             try:
                 account = Account.from_key(evm_key)
-                # Añadimos los parámetros de dominio EIP-712 aquí
-                scheme = ExactEvmScheme(
-                    signer=EthAccountSigner(account),
-                    extra={"name": "SciGate", "version": "1"}
-                )
+                # Intentamos pasar name y version directamente (estilo v2.8)
+                try:
+                    scheme = ExactEvmScheme(
+                        signer=EthAccountSigner(account),
+                        name="SciGate",
+                        version="1"
+                    )
+                except TypeError:
+                    # Si falla, intentamos el formato antiguo
+                    scheme = ExactEvmScheme(signer=EthAccountSigner(account))
+                
                 self.client.register("eip155:480", scheme)
                 print(f"✅ World Chain ID: {account.address}")
             except Exception as e:
@@ -39,7 +45,10 @@ class AutonomousX402Handler:
         if sol_key and Keypair:
             try:
                 kp = Keypair.from_base58_string(sol_key)
-                self.client.register("solana:5eykt4UsFv8P8NJdTREpY1vzqAQZSSfL", ExactSvmScheme(signer=KeypairSigner(kp)))
+                svm_scheme = ExactSvmScheme(signer=KeypairSigner(kp))
+                # Registramos ambos alias para evitar el "Unsupported SVM network"
+                self.client.register("solana:mainnet", svm_scheme)
+                self.client.register("solana:5eykt4UsFv8P8NJdTREpY1vzqAQZSSfL", svm_scheme)
                 print(f"✅ Solana Address: {kp.pubkey()}")
             except Exception as e:
                 print(f"❌ Error en Llave Solana: {str(e)}")
