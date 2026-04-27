@@ -41,13 +41,18 @@ class AutonomousX402Handler:
         print("------------------------------------------\n")
 
     async def _request(self, method: str, url: str, **kwargs):
+        # Aseguramos que kwargs['headers'] sea un dict
+        if "headers" not in kwargs or kwargs["headers"] is None:
+            kwargs["headers"] = {}
+        else:
+            kwargs["headers"] = dict(kwargs["headers"])
+
         async with httpx.AsyncClient() as client:
             # 1. Intentar la petición original
             resp = await client.request(method, url, **kwargs)
             
             # 2. Si es 402, negociar el pago
             if resp.status_code == 402:
-                # Intentamos obtener el header de varias formas (algunos proxies quitan el X- o cambian el nombre)
                 payment_req = (
                     resp.headers.get("X-402-Payment-Required") or 
                     resp.headers.get("x-402-payment-required") or
@@ -55,27 +60,28 @@ class AutonomousX402Handler:
                 )
                 
                 if not payment_req:
-                    print(f"⚠️ x402: Recibí 402 pero no encontré el header 'X-402-Payment-Required'. Headers: {list(resp.headers.keys())}")
+                    print(f"⚠️ x402: Recibí 402 sin header de pago. Headers: {list(resp.headers.keys())}")
                     return resp 
                 
                 print(f"🤝 x402: Negociando pago para {url}...")
                 try:
-                    # Parsear la cabecera en un objeto que x402 entienda
+                    # Parsear y generar el pago
                     req_obj = parse_payment_required(payment_req)
-                    
-                    # Generar el payload de pago usando el cliente x402
                     payment_proof = await self.client.create_payment_payload(req_obj)
                     
-                    # 3. Re-intentar con el header de Autorización x402
-                    new_kwargs = kwargs.copy()
-                    headers = new_kwargs.get("headers", {}).copy()
-                    headers["Authorization"] = f"x402 {payment_proof}"
-                    new_kwargs["headers"] = headers
+                    # Convertir el comprobante a string (algunas versiones devuelven un objeto)
+                    proof_str = str(payment_proof)
                     
-                    print(f"🚀 x402: Re-intentando con comprobante de pago...")
-                    return await client.request(method, url, **new_kwargs)
+                    # 3. Re-intentar con el header de Autorización x402
+                    new_headers = kwargs["headers"].copy()
+                    new_headers["Authorization"] = f"x402 {proof_str}"
+                    
+                    print(f"🚀 x402: Re-intentando con comprobante...")
+                    return await client.request(method, url, headers=new_headers, json=kwargs.get("json"), params=kwargs.get("params"))
                 except Exception as e:
                     print(f"❌ x402: Error al generar pago: {e}")
+                    import traceback
+                    traceback.print_exc() # Esto nos dirá exactamente en qué línea falló
                     return resp
             
             return resp
